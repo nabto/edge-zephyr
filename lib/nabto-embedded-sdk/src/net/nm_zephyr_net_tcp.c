@@ -44,24 +44,6 @@ struct np_tcp nm_zephyr_net_tcp_get_impl(struct nm_zephyr_net* ctx)
     return obj;
 }
 
-void nm_zephyr_net_tcp_build_fd_sets(struct nm_zephyr_net* ctx)
-{
-    struct np_tcp_socket* s;
-    nm_zephyr_net_lock(ctx);
-    NN_LLIST_FOREACH(s, &ctx->tcpSockets)
-    {
-        if (s->read.completionEvent != NULL) {
-            ZSOCK_FD_SET(s->fd, &ctx->readFds);
-            ctx->maxReadFd = NP_MAX(ctx->maxReadFd, s->fd);
-        }
-        if (s->write.completionEvent != NULL || s->connect.completionEvent != NULL) {
-            ZSOCK_FD_SET(s->fd, &ctx->writeFds);
-            ctx->maxWriteFd = NP_MAX(ctx->maxWriteFd, s->fd);
-        }
-    }
-    nm_zephyr_net_unlock(ctx);
-}
-
 void nm_zephyr_net_tcp_free_socket(struct np_tcp_socket* sock)
 {
     nm_zephyr_net_lock(sock->selectCtx);
@@ -75,28 +57,45 @@ void nm_zephyr_net_tcp_free_socket(struct np_tcp_socket* sock)
 
 }
 
-void nm_zephyr_net_tcp_handle_select(struct nm_zephyr_net* ctx, int nfds)
+
+bool nm_zephyr_net_tcp_add_to_poll(struct np_tcp_socket* s, struct zsock_pollfd* pollfd)
 {
-    (void)nfds;
-    struct np_tcp_socket* s;
-    nm_zephyr_net_lock(ctx);
-    NN_LLIST_FOREACH(s, &ctx->tcpSockets)
-    {
-        if (ZSOCK_FD_ISSET(s->fd, &ctx->readFds)) {
-            tcp_do_read(s);
-        }
-        if (ZSOCK_FD_ISSET(s->fd, &ctx->writeFds)) {
-            if (s->connect.completionEvent) {
-                is_connected(s);
-            }
-            if (s->write.completionEvent) {
-                tcp_do_write(s);
-            }
-        }
+    if (s->fd == -1) {
+        return false;
     }
-    nm_zephyr_net_unlock(ctx);
+
+    bool status = false;
+    if (s->read.completionEvent != NULL) {
+        pollfd->fd = s->fd;
+        pollfd->events = ZSOCK_POLLIN;
+        status = true;
+    }
+    if (s->write.completionEvent != NULL || s->connect.completionEvent != NULL) {
+        pollfd->fd = s->fd;
+        pollfd->events = ZSOCK_POLLOUT;
+        status = true;
+    }
+
+    return status;
 }
 
+void nm_zephyr_net_tcp_handle_poll_events(struct np_tcp_socket* s, struct zsock_pollfd* pollfd)
+{
+    bool read = (pollfd->revents & ZSOCK_POLLIN) != 0;
+    bool write = (pollfd->revents & ZSOCK_POLLOUT) != 0;
+
+    if (read) {
+        tcp_do_read(s);
+    }
+    if (write) {
+        if (s->connect.completionEvent) {
+            is_connected(s);
+        }
+        if (s->write.completionEvent) {
+            tcp_do_write(s);
+        }
+    }
+}
 
 np_error_code create(struct np_tcp* obj, struct np_tcp_socket** sock)
 {

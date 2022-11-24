@@ -5,12 +5,20 @@
 
 #include <platform/np_platform.h>
 
+#include <zephyr/net/socket.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void nm_zephyr_net_udp_build_fd_sets(struct nm_zephyr_net* ctx);
 void nm_zephyr_net_udp_handle_select(struct nm_zephyr_net* ctx, int nfds);
+
+/**
+ * return true iff the socket wants to be informed on events.
+ */
+bool nm_zephyr_net_udp_add_to_poll(struct np_udp_socket* udpSocket, struct zsock_pollfd* pollfd);
+void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* udpSocket, struct zsock_pollfd* pollfd);
 
 
 int nm_zephyr_net_udp_nonblocking_socket(int domain, int type);

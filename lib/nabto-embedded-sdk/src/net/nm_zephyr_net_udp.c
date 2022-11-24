@@ -12,7 +12,7 @@
 // #include <errno.h>
 // #include <string.h>
 // #include <unistd.h>
-// #include <fcntl.h>
+#include <fcntl.h>
 // #include <arpa/inet.h>
 // #include <net/if.h>
 // #include <ifaddrs.h>
@@ -221,51 +221,34 @@ void nm_zephyr_net_udp_free_socket(struct np_udp_socket* sock)
     np_free(sock);
 }
 
-void nm_zephyr_net_udp_build_fd_sets(struct nm_zephyr_net* ctx)
+
+bool nm_zephyr_net_udp_add_to_poll(struct np_udp_socket* s, struct zsock_pollfd* pollfd)
 {
-    struct np_udp_socket* s;
-    nm_zephyr_net_lock(ctx);
-    NN_LLIST_FOREACH(s, &ctx->udpSockets)
-    {
-        if (s->recv.completionEvent && s->sock != -1) {
-            ZSOCK_FD_SET(s->sock, &ctx->readFds);
-            ctx->maxReadFd = NP_MAX(ctx->maxReadFd, s->sock);
-        }
+    if (s->recv.completionEvent && s->sock != -1) {
+        pollfd->fd = s->sock;
+        pollfd->events = ZSOCK_POLLIN;
+        return true;
     }
-    nm_zephyr_net_unlock(ctx);
+    return false;
 }
 
-void nm_zephyr_net_udp_handle_select(struct nm_zephyr_net* ctx, int nfds)
+void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* s, struct zsock_pollfd* pollfd)
 {
-    (void)nfds;
-    struct np_udp_socket* s;
-
-    nm_zephyr_net_lock(ctx);
-    NN_LLIST_FOREACH(s, &ctx->udpSockets)
-    {
-        if (s->sock != -1 && ZSOCK_FD_ISSET(s->sock, &ctx->readFds)) {
-            nm_zephyr_net_udp_handle_event(s);
-        }
+    if ((pollfd->revents & ZSOCK_POLLIN) != 0) {
+        nm_zephyr_net_udp_handle_event(s);
     }
-    nm_zephyr_net_unlock(ctx);
 }
+
 
 
 int nm_zephyr_net_udp_nonblocking_socket(int domain, int type)
 {
-#if defined(SOCK_NONBLOCK)
-    return zsock_socket(domain, type | SOCK_NONBLOCK, 0);
-#endif
-
-#ifdef F_GETFL
     int sock = zsock_socket(domain, type, 0);
 
     int flags = zsock_fcntl(sock, F_GETFL, 0);
     if (flags == -1) flags = 0;
     zsock_fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     return sock;
-#endif
-    return -1;
 }
 
 np_error_code udp_send_to(struct np_udp_socket* s, const struct np_udp_endpoint* ep, const uint8_t* buffer, uint16_t bufferSize)
@@ -287,7 +270,7 @@ np_error_code udp_send_to(struct np_udp_socket* s, const struct np_udp_endpoint*
         return NABTO_EC_FAILED_TO_SEND_PACKET;
     }
 
-    NABTO_LOG_TRACE(LOG, "Sending packet of size %d, to %s:%d", bufferSize, np_ip_address_to_string(&sendIp), ep->port);
+    NABTO_LOG_TRACE(LOG, "Sending packet of size %d, to %s:%d on fd %d", bufferSize, np_ip_address_to_string(&sendIp), ep->port, s->sock);
     if (sendIp.type == NABTO_IPV4) {
         struct sockaddr_in srv_addr;
         srv_addr.sin_family = AF_INET;
@@ -408,7 +391,15 @@ uint16_t get_local_port(struct np_udp_socket* s)
 
 np_error_code create_socket_any(struct np_udp_socket* s)
 {
-    int sock = nm_zephyr_net_udp_nonblocking_socket(AF_INET6, SOCK_DGRAM);
+    int sock;
+    sock = nm_zephyr_net_udp_nonblocking_socket(AF_INET, SOCK_DGRAM);
+
+    s->type = NABTO_IPV4;
+    s->sock = sock;
+    return NABTO_EC_OK;
+    // TODO when sending v6 mapped v4 addresses using send_to then the packet is not being sent.
+
+    sock = nm_zephyr_net_udp_nonblocking_socket(AF_INET6, SOCK_DGRAM);
     if (sock == -1) {
         sock = nm_zephyr_net_udp_nonblocking_socket(AF_INET, SOCK_DGRAM);
         if (s->sock == -1) {

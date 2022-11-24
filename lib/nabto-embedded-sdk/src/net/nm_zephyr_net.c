@@ -21,6 +21,13 @@ static int nm_zephyr_net_inf_wait(struct nm_zephyr_net* ctx);
 
 static void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds);
 
+static void add_pipes(struct nm_zephyr_net* ctx);
+static void add_tcp_sockets(struct nm_zephyr_net* ctx);
+static void add_udp_sockets(struct nm_zephyr_net* ctx);
+
+#define NM_ZEPHYR_NET_STACK_SIZE 2048
+K_THREAD_STACK_DEFINE(stackData, NM_ZEPHYR_NET_STACK_SIZE);
+struct k_thread threadData;
 
 /**
  * Api functions start
@@ -45,7 +52,7 @@ void nm_zephyr_net_deinit(struct nm_zephyr_net* ctx)
     nm_zephyr_net_stop(ctx);
 
     if (ctx->running) {
-        k_thread_join(&ctx->threadData, K_FOREVER);
+        k_thread_join(&threadData, K_FOREVER);
         ctx->running = false;
     }
     zsock_close(ctx->pipefd[0]);
@@ -54,7 +61,7 @@ void nm_zephyr_net_deinit(struct nm_zephyr_net* ctx)
 
 void nm_zephyr_net_run(struct nm_zephyr_net* ctx)
 {
-    k_thread_create(&ctx->threadData, ctx->threadStack, K_KERNEL_STACK_SIZEOF(ctx->threadStack), network_thread,
+    k_thread_create(&threadData, stackData, K_THREAD_STACK_SIZEOF(stackData), network_thread,
         ctx, NULL, NULL,
         2 /** TODO thread priority */, 0, K_NO_WAIT);
     ctx->running = true;
@@ -72,11 +79,12 @@ int nm_zephyr_net_inf_wait(struct nm_zephyr_net* ctx)
 {
     int nfds;
     build_fd_sets(ctx);
-    nfds = zsock_select(NP_MAX(ctx->maxReadFd, ctx->maxWriteFd)+1, &ctx->readFds, &ctx->writeFds, NULL, NULL);
+
+    nfds = zsock_poll(ctx->pollfds, ctx->usedPollfds, INT_MAX);
     if (nfds < 0) {
-        NABTO_LOG_ERROR(LOG, "Error in select: (%i) '%s'", errno, strerror(errno));
+        NABTO_LOG_ERROR(LOG, "Error in zsock_poll: (%i)", nfds);
     } else {
-        NABTO_LOG_TRACE(LOG, "select returned with %i file descriptors", nfds);
+        NABTO_LOG_TRACE(LOG, "zsock_poll returned with %i file descriptors", nfds);
     }
     return nfds;
 }
@@ -85,11 +93,8 @@ int nm_zephyr_net_timed_wait(struct nm_zephyr_net* ctx, uint32_t ms)
 {
     NABTO_LOG_TRACE(LOG, "timed wait %d", ms);
     int nfds;
-    struct timeval timeout_val;
-    timeout_val.tv_sec = (ms/1000);
-    timeout_val.tv_usec = ((ms)%1000)*1000;
     build_fd_sets(ctx);
-    nfds = zsock_select(NP_MAX(ctx->maxReadFd, ctx->maxWriteFd)+1, &ctx->readFds, &ctx->writeFds, NULL, &timeout_val);
+    nfds = zsock_poll(ctx->pollfds, ctx->usedPollfds, ms);
     if (nfds < 0) {
         NABTO_LOG_ERROR(LOG, "Error in select wait: (%i) '%s'", errno, strerror(errno));
     }
@@ -98,18 +103,26 @@ int nm_zephyr_net_timed_wait(struct nm_zephyr_net* ctx, uint32_t ms)
 
 void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
 {
-    char one;
-    NABTO_LOG_TRACE(LOG, "read: %i", nfds);
-
-    if (ZSOCK_FD_ISSET(ctx->pipefd[0], &ctx->readFds)) {
-        (void)zsock_recv(ctx->pipefd[0], &one, 1, 0);
+    for (size_t i = 0; i < ctx->usedPollfds; i++) {
+        struct zsock_pollfd* pollfd = &ctx->pollfds[i];
+        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT)) != 0) {
+            struct pollfd_info* info = &ctx->pollfdInfo[i];
+            NABTO_LOG_INFO(LOG, "handle fd %d, of type %d", pollfd->fd, info->type);
+            if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
+                NABTO_LOG_INFO(LOG, "read pipe %d", pollfd->fd);
+                char one;
+                (void)zsock_recv(pollfd->fd, &one, 1, 0);
+            } else if (info->type == NM_ZEPHYR_NET_TYPE_UDP) {
+                NABTO_LOG_INFO(LOG, "read udp %d", pollfd->fd);
+                struct np_udp_socket* s = info->ptr;
+                nm_zephyr_net_udp_handle_poll_events(s, pollfd);
+            } else if (info->type == NM_ZEPHYR_NET_TYPE_TCP) {
+                NABTO_LOG_INFO(LOG, "read tcp %d", pollfd->fd);
+                struct np_tcp_socket* s = info->ptr;
+                nm_zephyr_net_tcp_handle_poll_events(s, pollfd);
+            }
+        }
     }
-    if (ZSOCK_FD_ISSET(ctx->pipefd[1], &ctx->readFds)) {
-        (void)zsock_recv(ctx->pipefd[1], &one, 1, 0);
-    }
-
-    nm_zephyr_net_udp_handle_select(ctx, nfds);
-    nm_zephyr_net_tcp_handle_select(ctx, nfds);
 }
 
 /**
@@ -118,20 +131,53 @@ void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
 
 void build_fd_sets(struct nm_zephyr_net* ctx)
 {
-    ZSOCK_FD_ZERO(&ctx->readFds);
-    ZSOCK_FD_ZERO(&ctx->writeFds);
-    ctx->maxReadFd = 0;
-    ctx->maxWriteFd = 0;
-    ZSOCK_FD_SET(ctx->pipefd[0], &ctx->readFds);
-    ctx->maxReadFd = NP_MAX(ctx->maxReadFd, ctx->pipefd[0]);
-    ZSOCK_FD_SET(ctx->pipefd[1], &ctx->readFds);
-    ctx->maxReadFd = NP_MAX(ctx->maxReadFd, ctx->pipefd[1]);
+    memset(ctx->pollfds, 0, sizeof(struct zsock_pollfd) * NM_ZEPHYR_NET_MAX_POLLFDS);
+    memset(ctx->pollfdInfo, 0, sizeof(struct pollfd_info) * NM_ZEPHYR_NET_MAX_POLLFDS);
 
-    // ensure there isn't other threads manipulating the list of
-    // sockets.
-    nm_zephyr_net_udp_build_fd_sets(ctx);
+    nm_zephyr_net_lock(ctx);
+    add_pipes(ctx);
+    add_udp_sockets(ctx);
+    add_tcp_sockets(ctx);
+    nm_zephyr_net_unlock(ctx);
+}
 
-    nm_zephyr_net_tcp_build_fd_sets(ctx);
+void add_pipes(struct nm_zephyr_net* ctx)
+{
+    ctx->pollfds[0].fd = ctx->pipefd[0];
+    ctx->pollfds[1].fd = ctx->pipefd[1];
+    ctx->pollfds[0].events = ZSOCK_POLLIN;
+    ctx->pollfds[1].events = ZSOCK_POLLIN;
+    ctx->pollfdInfo[0].type = NM_ZEPHYR_NET_TYPE_PIPE;
+    ctx->pollfdInfo[1].type = NM_ZEPHYR_NET_TYPE_PIPE;
+    ctx->usedPollfds = 2;
+}
+
+void add_udp_sockets(struct nm_zephyr_net* ctx)
+{
+    struct np_udp_socket* s;
+    NN_LLIST_FOREACH(s, &ctx->udpSockets)
+    {
+        struct zsock_pollfd* pollfd = &ctx->pollfds[ctx->usedPollfds];
+        if(nm_zephyr_net_udp_add_to_poll(s, pollfd)) {
+            ctx->pollfdInfo[ctx->usedPollfds].type = NM_ZEPHYR_NET_TYPE_UDP;
+            ctx->pollfdInfo[ctx->usedPollfds].ptr = s;
+            ctx->usedPollfds++;
+        }
+    }
+}
+
+void add_tcp_sockets(struct nm_zephyr_net* ctx)
+{
+    struct np_tcp_socket* s;
+    NN_LLIST_FOREACH(s, &ctx->tcpSockets)
+    {
+        struct zsock_pollfd* pollfd = &ctx->pollfds[ctx->usedPollfds];
+        if(nm_zephyr_net_tcp_add_to_poll(s, pollfd)) {
+            ctx->pollfdInfo[ctx->usedPollfds].type = NM_ZEPHYR_NET_TYPE_TCP;
+            ctx->pollfdInfo[ctx->usedPollfds].ptr = s;
+            ctx->usedPollfds++;
+        }
+    }
 }
 
 void nm_zephyr_net_notify(struct nm_zephyr_net* ctx)
@@ -141,6 +187,8 @@ void nm_zephyr_net_notify(struct nm_zephyr_net* ctx)
 
 void network_thread(void* data, void* data2, void* data3)
 {
+    k_thread_name_set(NULL, "network_thread");
+
     struct nm_zephyr_net* ctx = data;
     while(true) {
         int nfds;

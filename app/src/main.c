@@ -3,11 +3,12 @@
 #include <nabto/nabto_device_test.h>
 
 #include <stdio.h>
-
 LOG_MODULE_REGISTER(main);
 
 void nabto_log_output(NabtoDeviceLogMessage* msg, void* data)
 {
+    LOG_INF("%s", msg->message);
+    return;
     if (msg->severity == NABTO_DEVICE_LOG_ERROR) {
         LOG_ERR("%s", msg->message);
     } else if (msg->severity == NABTO_DEVICE_LOG_INFO) {
@@ -27,10 +28,12 @@ void main(void) {
     // wait for dhcp
     k_sleep(K_MSEC(4000));
 
-
+    //return;
 
     nabto_device_set_log_callback(NULL, nabto_log_output, NULL);
-    nabto_device_set_log_level(NULL, "trace");
+    if (nabto_device_set_log_level(NULL, "trace") != NABTO_DEVICE_EC_OK) {
+        LOG_INF("Failed to set loglevel");
+    }
 
     NabtoDevice* device = nabto_device_test_new();
     if (device == NULL) {

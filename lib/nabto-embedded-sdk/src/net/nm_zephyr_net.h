@@ -11,6 +11,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/net/socket_select.h>
+#include <zephyr/net/socket.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,21 +62,31 @@ struct np_tcp_socket {
     bool aborted;
 };
 
-#define NM_ZEPHYR_NET_STACK_SIZE 512
 
 
+enum pollfd_type {
+    NM_ZEPHYR_NET_TYPE_UDP,
+    NM_ZEPHYR_NET_TYPE_TCP,
+    NM_ZEPHYR_NET_TYPE_PIPE
+};
+
+struct pollfd_info
+{
+    enum pollfd_type type;
+    void* ptr;
+};
+
+#define NM_ZEPHYR_NET_MAX_POLLFDS 42
 
 struct nm_zephyr_net {
-    zsock_fd_set readFds;
-    zsock_fd_set writeFds;
-    int maxReadFd;
-    int maxWriteFd;
+    struct zsock_pollfd pollfds[NM_ZEPHYR_NET_MAX_POLLFDS];
+    struct pollfd_info pollfdInfo[NM_ZEPHYR_NET_MAX_POLLFDS];
+    size_t usedPollfds;
+
     int pipefd[2];
     struct nn_llist udpSockets;
     struct nn_llist tcpSockets;
 
-    struct k_thread threadData;
-    K_KERNEL_STACK_MEMBER(threadStack, NM_ZEPHYR_NET_STACK_SIZE);
     //pthread_t thread;
     // synchronize core thread and select thread access to the list of sockets.
     struct k_mutex mutex;
