@@ -1,0 +1,74 @@
+#include <api/nabto_device_platform.h>
+
+#include <platform/np_error_code.h>
+#include <platform/np_allocator.h>
+
+#include <api/nabto_device_defines.h>
+#include <api/nabto_device_integration.h>
+
+#include <net/nm_zephyr_net.h>
+
+#include "nabto_event_queue_zephyr.h"
+#include <ts/nm_zephyr_timestamp.h>
+#include <dns/nm_zephyr_dns.h>
+
+
+
+struct nabto_device_platform_zephyr {
+    struct nm_zephyr_net netCtx;
+    struct nabto_event_queue_zephyr eventQueueZephyr;
+};
+
+np_error_code nabto_device_platform_init(struct nabto_device_context* device, struct nabto_device_mutex* coreMutex)
+{
+    struct nabto_device_platform_zephyr* platformAdapter = np_calloc(1, sizeof(struct nabto_device_platform_zephyr));
+    if (platformAdapter == NULL) {
+        return NABTO_EC_OUT_OF_MEMORY;
+    }
+    nabto_device_integration_set_platform_data(device, platformAdapter);
+
+
+    np_error_code ec = nabto_event_queue_zephyr_init(&platformAdapter->eventQueueZephyr, coreMutex);
+    if (ec != NABTO_EC_OK) {
+        return ec;
+    }
+
+    ec = nm_zephyr_net_init(&platformAdapter->netCtx);
+    if (ec != NABTO_EC_OK) {
+        return ec;
+    }
+
+    nm_zephyr_net_run(&platformAdapter->netCtx);
+
+    struct np_udp udp = nm_zephyr_net_udp_get_impl(&platformAdapter->netCtx);
+    struct np_tcp tcp = nm_zephyr_net_tcp_get_impl(&platformAdapter->netCtx);
+    struct np_event_queue eq = nabto_event_queue_zephyr_get_impl(&platformAdapter->eventQueueZephyr);
+    struct np_timestamp timestamp = nm_zephyr_ts_get_impl();
+    struct np_dns dns = nm_zephyr_dns_get_impl();
+    //struct np_local_ip localIp = nm_libevent_local_ip_get_impl(&platform->libeventContext);
+
+    nabto_device_integration_set_udp_impl(device, &udp);
+    nabto_device_integration_set_tcp_impl(device, &tcp);
+    nabto_device_integration_set_timestamp_impl(device, &timestamp);
+    nabto_device_integration_set_dns_impl(device, &dns);
+    nabto_device_integration_set_event_queue_impl(device, &eq);
+    //nabto_device_integration_set_local_ip_impl(device, &localIp);
+    //nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
+
+    return NABTO_EC_OK;
+}
+
+void nabto_device_platform_deinit(struct nabto_device_context* device)
+{
+    np_free(device->platformAdapter);
+}
+
+void nabto_device_platform_close(struct nabto_device_context* device, struct np_completion_event* closeEvent)
+{
+    // do nothing as mdns is handled by zephyr
+}
+
+void nabto_device_platform_stop_blocking(struct nabto_device_context* device)
+{
+    // TODO stop queues
+}

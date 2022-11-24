@@ -1,0 +1,6 @@
+
+menu "Libraries"
+
+rsource "nabto-embedded-sdk/Kconfig"
+
+endmenu

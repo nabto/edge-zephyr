@@ -1,0 +1,1 @@
+add_subdirectory_ifdef(CONFIG_NABTO_EMBEDDED_SDK nabto-embedded-sdk)
