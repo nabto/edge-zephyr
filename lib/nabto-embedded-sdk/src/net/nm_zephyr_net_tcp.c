@@ -64,15 +64,17 @@ bool nm_zephyr_net_tcp_add_to_poll(struct np_tcp_socket* s, struct zsock_pollfd*
         return false;
     }
 
+    pollfd->events = 0;
+
     bool status = false;
     if (s->read.completionEvent != NULL) {
         pollfd->fd = s->fd;
-        pollfd->events = ZSOCK_POLLIN;
+        pollfd->events |= ZSOCK_POLLIN;
         status = true;
     }
     if (s->write.completionEvent != NULL || s->connect.completionEvent != NULL) {
         pollfd->fd = s->fd;
-        pollfd->events = ZSOCK_POLLOUT;
+        pollfd->events |= ZSOCK_POLLOUT;
         status = true;
     }
 

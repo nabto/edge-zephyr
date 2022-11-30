@@ -8,6 +8,8 @@
 
 
 #include <zephyr/net/socket.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/igmp.h>
 
 // #include <sys/socket.h>
 // #include <netinet/in.h>
@@ -60,7 +62,8 @@ np_error_code nm_zephyr_net_async_bind_mdns_ipv4_ec(struct np_udp_socket* sock)
     }
 
     if (!init_mdns_ipv4_socket(sock->sock)) {
-        close(sock->sock);
+        NABTO_LOG_ERROR(LOG, "init_mdns_ipv4_socket failed");
+        zsock_close(sock->sock);
         return NABTO_EC_UDP_SOCKET_CREATION_ERROR;
     }
 
@@ -88,14 +91,14 @@ np_error_code nm_zephyr_net_async_bind_mdns_ipv6_ec(struct np_udp_socket* sock)
     }
 
     int no = 0;
-    int status = setsockopt(sock->sock, IPPROTO_IPV6, IPV6_V6ONLY, (void* ) &no, sizeof(no));
+    int status = zsock_setsockopt(sock->sock, IPPROTO_IPV6, IPV6_V6ONLY, (void* ) &no, sizeof(no));
     if (status < 0)
     {
         NABTO_LOG_ERROR(LOG, "Cannot set IPV6_V6ONLY");
     }
 
     if (!init_mdns_ipv6_socket(sock->sock)) {
-        close(sock->sock);
+        zsock_close(sock->sock);
         return NABTO_EC_UDP_SOCKET_CREATION_ERROR;
     }
 
@@ -119,7 +122,7 @@ np_error_code create_socket_ipv6(struct np_udp_socket* s)
     }
 
     int no = 0;
-    int status = setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void* ) &no, sizeof(no));
+    int status = zsock_setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void* ) &no, sizeof(no));
     if (status < 0) {
         NABTO_LOG_ERROR(LOG, "Cannot set IPV6_V6ONLY");
     }
@@ -144,33 +147,18 @@ np_error_code create_socket_ipv4(struct np_udp_socket* s)
 bool init_mdns_ipv6_socket(int sock)
 {
     int reuse = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
+    if (zsock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
         return false;
     }
-
-#ifdef SO_REUSEPORT
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) {
-        return false;
-    }
-#endif
 
     struct sockaddr_in6 si_me;
     memset(&si_me, 0, sizeof(si_me));
     si_me.sin6_family = AF_INET6;
     si_me.sin6_port = htons(5353);
     si_me.sin6_addr = in6addr_any;
-    if (bind(sock, (struct sockaddr*)&si_me, sizeof(si_me)) < 0) {
+    if (zsock_bind(sock, (struct sockaddr*)&si_me, sizeof(si_me)) < 0) {
         NABTO_LOG_INFO(LOG, "bind mdns ipv6 failed (%d) %s", errno, strerror(errno));
         return false;
-    }
-
-    struct ipv6_mreq group;
-    memset(&group, 0, sizeof(struct ipv6_mreq));
-    inet_pton(AF_INET6, "ff02::fb", &group.ipv6mr_multiaddr);
-    group.ipv6mr_interface = 0;
-    int status = setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char *)&group, sizeof(struct ipv6_mreq));
-    if (status < 0) {
-        NABTO_LOG_ERROR(LOG, "Cannot add ipv6 default membership %d", errno);
     }
 
     return true;
@@ -180,32 +168,19 @@ bool init_mdns_ipv6_socket(int sock)
 bool init_mdns_ipv4_socket(int sock)
 {
     int reuse = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
+    if (zsock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
+        NABTO_LOG_ERROR(LOG, "could not set SO_REUSEADDR");
         return false;
     }
-
-#ifdef SO_REUSEPORT
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) {
-        return false;
-    }
-#endif
 
     struct sockaddr_in si_me;
     memset(&si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(5353);
     si_me.sin_addr.s_addr = INADDR_ANY;
-    if (bind(sock, (struct sockaddr*)&si_me, sizeof(si_me)) < 0) {
+    if (zsock_bind(sock, (struct sockaddr*)&si_me, sizeof(si_me)) < 0) {
+        NABTO_LOG_ERROR(LOG, "bind failed");
         return false;
-    }
-
-    struct ip_mreq group;
-    memset(&group, 0, sizeof(struct ip_mreq));
-    group.imr_multiaddr.s_addr = inet_addr("224.0.0.251");
-    group.imr_interface.s_addr = INADDR_ANY;
-    int status = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&group, sizeof(group));
-    if (status < 0) {
-        NABTO_LOG_ERROR(LOG, "Cannot add ipv4 default membership %d", errno);
     }
 
     return true;
@@ -213,63 +188,27 @@ bool init_mdns_ipv4_socket(int sock)
 
 void mdns_update_ipv4_socket_registration(int sock)
 {
-    struct ifaddrs* interfaces = NULL;
-    if (getifaddrs(&interfaces) == 0) {
+    struct in_addr addr;
 
-        struct ifaddrs* iterator = interfaces;
-        while (iterator != NULL) {
-            if (iterator->ifa_addr != NULL) {
-                struct ip_mreqn group;
-                memset(&group, 0, sizeof(struct ip_mreq));
-                group.imr_multiaddr.s_addr = inet_addr("224.0.0.251");
-                //struct sockaddr_in* in = (struct sockaddr_in*)iterator->ifa_addr;
-                int index = if_nametoindex(iterator->ifa_name);
-                group.imr_ifindex = index;
-                int status = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&group, sizeof(group));
-                if (status < 0) {
-                    if (errno == EADDRINUSE) {
-                        // ok probable already registered
-                    } else {
-                        NABTO_LOG_TRACE(LOG, "Cannot add ipv4 membership %d interface %s", errno, iterator->ifa_name);
-                    }
-                }
-
-            }
-
-            iterator = iterator->ifa_next;
-        }
-        freeifaddrs(interfaces);
+    addr.s_addr = htonl(0xE00000FB); // 224.0.0.251
+    struct net_if *iface;
+    iface = net_if_get_default();
+    int ec = net_ipv4_igmp_join(iface, &addr);
+    if (ec != 0) {
+        NABTO_LOG_ERROR(LOG, "Could not join ipv4 mdns multicast group.");
     }
 }
 
 void mdns_update_ipv6_socket_registration(int sock)
 {
-    struct ifaddrs* interfaces = NULL;
-    if (getifaddrs(&interfaces) == 0) {
-
-        struct ifaddrs* iterator = interfaces;
-        while (iterator != NULL) {
-            if (iterator->ifa_addr != NULL)
-            {
-                int index = if_nametoindex(iterator->ifa_name);
-
-                struct ipv6_mreq group;
-                memset(&group, 0, sizeof(struct ipv6_mreq));
-                inet_pton(AF_INET6, "ff02::fb", &group.ipv6mr_multiaddr);
-                group.ipv6mr_interface = index;
-                int status = setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char *)&group, sizeof(struct ipv6_mreq));
-                if (status < 0) {
-                    if (errno == EADDRINUSE) {
-                        // some interface indexes occurs more than
-                        // once, the interface can only be joined for
-                        // a multicast group once for each socket.
-                    } else {
-                        NABTO_LOG_TRACE(LOG, "Cannot add ipv6 membership %d interface name %s", errno, iterator->ifa_name);
-                    }
-                }
-            }
-            iterator = iterator->ifa_next;
-        }
-        freeifaddrs(interfaces);
+    struct net_if *iface;
+    iface = net_if_get_default();
+    struct in6_addr addr;
+    net_ipv6_addr_create(&addr, 0xff02, 0, 0, 0, 0, 0, 0, 0x00fb);
+    struct net_if_mcast_addr* maddr =  net_if_ipv6_maddr_add(iface, &addr);
+    if (maddr == NULL) {
+        NABTO_LOG_ERROR(LOG, "Could not add ipv6 multicast address.");
+    } else {
+        net_if_ipv6_maddr_join(maddr);
     }
 }

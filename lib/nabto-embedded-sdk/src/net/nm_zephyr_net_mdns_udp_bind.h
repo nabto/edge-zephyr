@@ -1,5 +1,5 @@
-#ifndef _nm_zephyr_net_MDNS_UDP_BIND_H_
-#define _nm_zephyr_net_MDNS_UDP_BIND_H_
+#ifndef _NM_ZEPHYR_NET_MDNS_UDP_BIND_H_
+#define _NM_ZEPHYR_NET_MDNS_UDP_BIND_H_
 
 #include <modules/mdns/nm_mdns_udp_bind.h>
 

@@ -82,7 +82,7 @@ int nm_zephyr_net_inf_wait(struct nm_zephyr_net* ctx)
 
     nfds = zsock_poll(ctx->pollfds, ctx->usedPollfds, INT_MAX);
     if (nfds < 0) {
-        NABTO_LOG_ERROR(LOG, "Error in zsock_poll: (%i)", nfds);
+        NABTO_LOG_ERROR(LOG, "Error in zsock_poll: (%i), errno (%s)", nfds, strerror(errno));
     } else {
         NABTO_LOG_TRACE(LOG, "zsock_poll returned with %i file descriptors", nfds);
     }
@@ -107,17 +107,13 @@ void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
         struct zsock_pollfd* pollfd = &ctx->pollfds[i];
         if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT)) != 0) {
             struct pollfd_info* info = &ctx->pollfdInfo[i];
-            NABTO_LOG_INFO(LOG, "handle fd %d, of type %d", pollfd->fd, info->type);
             if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
-                NABTO_LOG_INFO(LOG, "read pipe %d", pollfd->fd);
                 char one;
                 (void)zsock_recv(pollfd->fd, &one, 1, 0);
             } else if (info->type == NM_ZEPHYR_NET_TYPE_UDP) {
-                NABTO_LOG_INFO(LOG, "read udp %d", pollfd->fd);
                 struct np_udp_socket* s = info->ptr;
                 nm_zephyr_net_udp_handle_poll_events(s, pollfd);
             } else if (info->type == NM_ZEPHYR_NET_TYPE_TCP) {
-                NABTO_LOG_INFO(LOG, "read tcp %d", pollfd->fd);
                 struct np_tcp_socket* s = info->ptr;
                 nm_zephyr_net_tcp_handle_poll_events(s, pollfd);
             }
@@ -131,8 +127,8 @@ void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
 
 void build_fd_sets(struct nm_zephyr_net* ctx)
 {
-    memset(ctx->pollfds, 0, sizeof(struct zsock_pollfd) * NM_ZEPHYR_NET_MAX_POLLFDS);
-    memset(ctx->pollfdInfo, 0, sizeof(struct pollfd_info) * NM_ZEPHYR_NET_MAX_POLLFDS);
+    memset(ctx->pollfds, 0, sizeof(struct zsock_pollfd) * CONFIG_NET_SOCKETS_POLL_MAX);
+    memset(ctx->pollfdInfo, 0, sizeof(struct pollfd_info) * CONFIG_NET_SOCKETS_POLL_MAX);
 
     nm_zephyr_net_lock(ctx);
     add_pipes(ctx);
@@ -157,6 +153,10 @@ void add_udp_sockets(struct nm_zephyr_net* ctx)
     struct np_udp_socket* s;
     NN_LLIST_FOREACH(s, &ctx->udpSockets)
     {
+        if (ctx->usedPollfds > CONFIG_NET_SOCKETS_POLL_MAX-1) {
+            NABTO_LOG_ERROR(LOG, "CONFIG_NET_SOCKETS_POLL_MAX set too low");
+            return;
+        }
         struct zsock_pollfd* pollfd = &ctx->pollfds[ctx->usedPollfds];
         if(nm_zephyr_net_udp_add_to_poll(s, pollfd)) {
             ctx->pollfdInfo[ctx->usedPollfds].type = NM_ZEPHYR_NET_TYPE_UDP;
@@ -171,6 +171,10 @@ void add_tcp_sockets(struct nm_zephyr_net* ctx)
     struct np_tcp_socket* s;
     NN_LLIST_FOREACH(s, &ctx->tcpSockets)
     {
+        if (ctx->usedPollfds > CONFIG_NET_SOCKETS_POLL_MAX-1) {
+            NABTO_LOG_ERROR(LOG, "CONFIG_NET_SOCKETS_POLL_MAX set too low");
+            return;
+        }
         struct zsock_pollfd* pollfd = &ctx->pollfds[ctx->usedPollfds];
         if(nm_zephyr_net_tcp_add_to_poll(s, pollfd)) {
             ctx->pollfdInfo[ctx->usedPollfds].type = NM_ZEPHYR_NET_TYPE_TCP;
@@ -200,7 +204,11 @@ void network_thread(void* data, void* data2, void* data3)
         } else {
             // Wait for events.
             nfds = nm_zephyr_net_inf_wait(ctx);
-            nm_zephyr_net_read(ctx, nfds);
+            if (nfds > 0) {
+                nm_zephyr_net_read(ctx, nfds);
+            } else if (nfds < 0) {
+                k_sleep(K_MSEC(1000));
+            }
         }
     }
 }

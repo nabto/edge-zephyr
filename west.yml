@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 manifest:
-#  self:
-#    path: app
-#    west-commands: scripts/west-commands.yml
+  self:
+    west-commands: scripts/west-commands.yml
 
   remotes:
     - name: zephyrproject-rtos
@@ -19,6 +18,6 @@ manifest:
       import: true
     - name: nabto-embedded-sdk
       remote: nabto
-      revision: master
+      revision: SC-1701
       submodules: true
       path: modules/lib/nabto-embedded-sdk

@@ -1,6 +1,7 @@
 set(NABTO_EMBEDDED_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../modules/lib/nabto-embedded-sdk)
 
 include(${NABTO_EMBEDDED_SDK_DIR}/nabto_primary_files.cmake)
+include(${NABTO_EMBEDDED_SDK_DIR}/nabto_modules_files.cmake)
 
 set(src
     src/nabto_platform_zephyr.c
@@ -10,11 +11,15 @@ set(src
     src/net/nm_zephyr_net_tcp.c
     src/net/nm_zephyr_net_udp.c
     src/net/nm_zephyr_net.c
+    src/net/nm_zephyr_net_mdns_udp_bind.c
+    src/net/nm_zephyr_net_local_ip.c
     src/dns/nm_zephyr_dns.c
     src/ts/nm_zephyr_timestamp.c
+    src/shell/nm_zephyr_shell.c
     ${ne_required_src_no_tls}
     ${ne_mbedtls_module_src}
     ${ne_api_test_src}
+    ${ne_modules_mdns_src}
 )
 
 zephyr_library()
@@ -23,6 +28,7 @@ zephyr_library_include_directories(${ne_priv_include_dirs_no_tls})
 zephyr_library_sources(${src})
 zephyr_link_libraries(mbedTLS)
 zephyr_library_compile_definitions(-DNABTO_DEVICE_NO_FUTURE_QUEUE)
+zephyr_library_compile_definitions(-DNP_CONFIG_FILE=<np_config_zephyr.h>)
 
 
 

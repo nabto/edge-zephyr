@@ -7,16 +7,21 @@
 #include <api/nabto_device_integration.h>
 
 #include <net/nm_zephyr_net.h>
+#include <net/nm_zephyr_net_mdns_udp_bind.h>
 
 #include "nabto_event_queue_zephyr.h"
 #include <ts/nm_zephyr_timestamp.h>
 #include <dns/nm_zephyr_dns.h>
 
+#include <modules/mdns/nm_mdns_server.h>
+
+#define LOG NABTO_LOG_MODULE_PLATFORM
 
 
 struct nabto_device_platform_zephyr {
     struct nm_zephyr_net netCtx;
     struct nabto_event_queue_zephyr eventQueueZephyr;
+    struct nm_mdns_server mdnsServer;
 };
 
 np_error_code nabto_device_platform_init(struct nabto_device_context* device, struct nabto_device_mutex* coreMutex)
@@ -45,15 +50,24 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     struct np_event_queue eq = nabto_event_queue_zephyr_get_impl(&platformAdapter->eventQueueZephyr);
     struct np_timestamp timestamp = nm_zephyr_ts_get_impl();
     struct np_dns dns = nm_zephyr_dns_get_impl();
-    //struct np_local_ip localIp = nm_libevent_local_ip_get_impl(&platform->libeventContext);
+    struct np_local_ip localIp = nm_zephyr_net_local_ip_get_impl(&platformAdapter->netCtx);
+
+    struct nm_mdns_udp_bind mdnsUdpBind = nm_zephyr_net_mdns_udp_bind_get_impl(&platformAdapter->netCtx);
+    ec = nm_mdns_server_init(&platformAdapter->mdnsServer, &eq, &udp, &mdnsUdpBind, &localIp);
+    if (ec != NABTO_EC_OK) {
+        NABTO_LOG_ERROR(LOG, "Could not start mdns server");
+        return ec;
+    }
+
+    struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
 
     nabto_device_integration_set_udp_impl(device, &udp);
     nabto_device_integration_set_tcp_impl(device, &tcp);
     nabto_device_integration_set_timestamp_impl(device, &timestamp);
     nabto_device_integration_set_dns_impl(device, &dns);
     nabto_device_integration_set_event_queue_impl(device, &eq);
-    //nabto_device_integration_set_local_ip_impl(device, &localIp);
-    //nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
+    nabto_device_integration_set_local_ip_impl(device, &localIp);
+    nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
 
     return NABTO_EC_OK;
 }

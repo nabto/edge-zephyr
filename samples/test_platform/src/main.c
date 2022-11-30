@@ -21,6 +21,9 @@ void nabto_log_output(NabtoDeviceLogMessage* msg, void* data)
 }
 
 void main(void) {
+    LOG_INF("Started");
+    return;
+
     struct net_if *iface;
     iface = net_if_get_default();
     net_dhcpv4_start(iface);
@@ -80,6 +83,10 @@ void main(void) {
         } else {
             LOG_INF("udp test failed");
         }
+
+        nabto_device_test_mdns_publish_service(device);
+
+        k_sleep(K_FOREVER);
 
         nabto_device_future_free(future);
         nabto_device_test_free(device);

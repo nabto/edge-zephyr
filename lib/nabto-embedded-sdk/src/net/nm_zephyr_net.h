@@ -5,8 +5,6 @@
 #include <platform/np_platform.h>
 #include <api/nabto_device_threads.h>
 
-#include <sys/select.h>
-
 #include <nn/llist.h>
 
 #include <zephyr/kernel.h>
@@ -76,11 +74,9 @@ struct pollfd_info
     void* ptr;
 };
 
-#define NM_ZEPHYR_NET_MAX_POLLFDS 42
-
 struct nm_zephyr_net {
-    struct zsock_pollfd pollfds[NM_ZEPHYR_NET_MAX_POLLFDS];
-    struct pollfd_info pollfdInfo[NM_ZEPHYR_NET_MAX_POLLFDS];
+    struct zsock_pollfd pollfds[CONFIG_NET_SOCKETS_POLL_MAX];
+    struct pollfd_info pollfdInfo[CONFIG_NET_SOCKETS_POLL_MAX];
     size_t usedPollfds;
 
     int pipefd[2];
@@ -127,6 +123,11 @@ struct np_udp nm_zephyr_net_udp_get_impl(struct nm_zephyr_net* ctx);
  * Get an object implementing the tcp interface.
  */
 struct np_tcp nm_zephyr_net_tcp_get_impl(struct nm_zephyr_net* ctx);
+
+/**
+ * Get an object implementing the local ip interface
+ */
+struct np_local_ip nm_zephyr_net_local_ip_get_impl(struct nm_zephyr_net* ctx);
 
 
 #ifdef __cplusplus
