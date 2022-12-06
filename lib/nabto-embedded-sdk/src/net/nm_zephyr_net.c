@@ -36,6 +36,7 @@ np_error_code nm_zephyr_net_init(struct nm_zephyr_net* ctx)
 {
     nn_llist_init(&ctx->udpSockets);
     nn_llist_init(&ctx->tcpSockets);
+    nn_llist_init(&ctx->tcpSocketsPendingClose);
     k_mutex_init(&ctx->mutex);
     ctx->stopped = false;
     ctx->running = false;
@@ -184,6 +185,18 @@ void add_tcp_sockets(struct nm_zephyr_net* ctx)
     }
 }
 
+void nm_zephyr_net_remove_tcp_sockets(struct nm_zephyr_net* ctx)
+{
+    struct nn_llist_iterator it = nn_llist_begin(&ctx->tcpSocketsPendingClose);
+    while ( !nn_llist_is_end(&it) ) {
+        struct np_tcp_socket* tcpSocket = nn_llist_get_item(&it);
+        struct nn_llist_iterator current = it;
+        nn_llist_next(&it);
+        nm_zephyr_net_tcp_socket_free_from_poll_loop(tcpSocket);
+        nn_llist_erase(&current);
+    }
+}
+
 void nm_zephyr_net_notify(struct nm_zephyr_net* ctx)
 {
     (void)zsock_send(ctx->pipefd[1], "1", 1, 0);
@@ -199,6 +212,7 @@ void network_thread(void* data, void* data2, void* data3)
         nm_zephyr_net_lock(ctx);
         bool stopped = ctx->stopped;
         nm_zephyr_net_unlock(ctx);
+        nm_zephyr_net_remove_tcp_sockets(ctx);
         if (stopped) {
             return;
         } else {
@@ -209,6 +223,7 @@ void network_thread(void* data, void* data2, void* data3)
             } else if (nfds < 0) {
                 k_sleep(K_MSEC(1000));
             }
+
         }
     }
 }

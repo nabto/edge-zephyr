@@ -52,9 +52,18 @@ void nm_zephyr_net_tcp_free_socket(struct np_tcp_socket* sock)
 
     tcp_abort(sock);
     zsock_shutdown(sock->fd, ZSOCK_SHUT_RDWR);
-    zsock_close(sock->fd);
-    np_free(sock);
 
+    nm_zephyr_net_lock(sock->selectCtx);
+    // add the socket to a list for pending close such that we do not close a socket while it is being polled on.
+    nn_llist_append(&sock->selectCtx->tcpSocketsPendingClose, &sock->tcpSocketsNode, sock);
+    nm_zephyr_net_unlock(sock->selectCtx);
+}
+
+void nm_zephyr_net_tcp_socket_free_from_poll_loop(struct np_tcp_socket* tcpSocket)
+{
+    NABTO_LOG_INFO(LOG, "nm_zephyr_net_tcp_socket_free_from_poll_loop");
+    zsock_close(tcpSocket->fd);
+    np_free(tcpSocket);
 }
 
 
@@ -137,7 +146,9 @@ np_error_code async_connect_ec(struct np_tcp_socket* sock, struct np_ip_address*
 
     if (address->type == NABTO_IPV4) {
         s = zsock_socket(AF_INET, type, 0);
+        NABTO_LOG_INFO(LOG, "Trying to make v4 tcp socket status %d");
     } else if (address->type == NABTO_IPV6) {
+        NABTO_LOG_INFO(LOG, "Trying to make v6 tcp socket");
         s = zsock_socket(AF_INET6, type, 0);
     } else {
         return NABTO_EC_NOT_SUPPORTED;
@@ -168,44 +179,11 @@ np_error_code async_connect_ec(struct np_tcp_socket* sock, struct np_ip_address*
         NABTO_LOG_ERROR(LOG, "Could not set socket option TCP_NODELAY");
     }
 
-    flags = 1;
-    if(zsock_setsockopt(sock->fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof(flags)) < 0) {
-        NABTO_LOG_ERROR(LOG, "could not enable KEEPALIVE");
-    }
-
-
-#ifdef SOL_TCP
-    // Linux
-    flags = 9;
-    if(zsock_setsockopt(sock->fd, SOL_TCP, TCP_KEEPCNT, &flags, sizeof(flags)) < 0) {
-        NABTO_LOG_ERROR(LOG, "could not set TCP_KEEPCNT");
-    }
-
-    flags = 60;
-    if(zsock_setsockopt(sock->fd, SOL_TCP, TCP_KEEPIDLE, &flags, sizeof(flags)) < 0) {
-        NABTO_LOG_ERROR(LOG, "could not set TCP_KEEPIDLE");
-    }
-
-    flags = 60;
-    if(zsock_setsockopt(sock->fd, SOL_TCP, TCP_KEEPINTVL, &flags, sizeof(flags)) < 0) {
-        NABTO_LOG_ERROR(LOG, "could not set TCP KEEPINTVL");
-    }
-#endif
-
-
 #if defined(SOL_SOCKET) && defined(SO_NOSIGPIPE)
     // Mac
     flags = 1;
     if (zsock_setsockopt(sock->fd, SOL_SOCKET, SO_NOSIGPIPE, (char *) &flags, sizeof(int)) != 0) {
         NABTO_LOG_ERROR(LOG, "Could not set socket option SO_NOSIGPIPE");
-    }
-#endif
-
-#if defined(IPPROTO_TCP) && defined(TCP_KEEPALIVE)
-    // Mac
-    flags = 60;
-    if(zsock_setsockopt(sock->fd, IPPROTO_TCP, TCP_KEEPALIVE, &flags, sizeof(flags)) < 0) {
-        NABTO_LOG_ERROR(LOG, "could not set TCP_KEEPCNT");
     }
 #endif
 
@@ -291,6 +269,7 @@ np_error_code is_connected_ec(struct np_tcp_socket* sock)
 }
 
 void is_connected(struct np_tcp_socket* sock) {
+    NABTO_LOG_INFO(LOG, "is_connected");
     if (sock->connect.completionEvent == NULL) {
         return;
     }
@@ -305,6 +284,7 @@ void is_connected(struct np_tcp_socket* sock) {
 
 np_error_code tcp_do_write_ec(struct np_tcp_socket* sock)
 {
+    NABTO_LOG_INFO(LOG, "tcp_do_write_ec");
     int sent = zsock_send(sock->fd, sock->write.data, sock->write.dataLength, MSG_NOSIGNAL);
     if (sent < 0) {
         if (sent == EAGAIN || sent == EWOULDBLOCK) {
@@ -343,6 +323,7 @@ void tcp_do_write(struct np_tcp_socket* sock)
 np_error_code async_write_ec(struct np_tcp_socket* sock, const void* data, size_t dataLength)
 
 {
+    NABTO_LOG_INFO(LOG, "async_write_ec");
     sock->write.data = data;
     sock->write.dataLength = dataLength;
 
@@ -352,6 +333,7 @@ np_error_code async_write_ec(struct np_tcp_socket* sock, const void* data, size_
 
 void async_write(struct np_tcp_socket* sock, const void* data, size_t dataLength, struct np_completion_event* completionEvent)
 {
+    NABTO_LOG_INFO(LOG, "async_write");
     if (sock->aborted) {
         np_completion_event_resolve(completionEvent, NABTO_EC_ABORTED);
         return;
@@ -372,6 +354,7 @@ void async_write(struct np_tcp_socket* sock, const void* data, size_t dataLength
 
 np_error_code tcp_do_read_ec(struct np_tcp_socket* sock)
 {
+    NABTO_LOG_INFO(LOG, "tcp_do_read_ec");
     int readen = zsock_recv(sock->fd, sock->read.buffer, sock->read.bufferSize, 0);
     if (readen == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -390,6 +373,7 @@ np_error_code tcp_do_read_ec(struct np_tcp_socket* sock)
 
 void tcp_do_read(struct np_tcp_socket* sock)
 {
+    NABTO_LOG_INFO(LOG, "tcp_do_read");
     if (sock->read.completionEvent == NULL) {
         return;
     }
@@ -406,6 +390,7 @@ void tcp_do_read(struct np_tcp_socket* sock)
 
 void async_read(struct np_tcp_socket* sock, void* buffer, size_t bufferSize, size_t* readLength, struct np_completion_event* completionEvent)
 {
+    NABTO_LOG_INFO(LOG, "async_read");
     if (sock->aborted) {
         np_completion_event_resolve(completionEvent, NABTO_EC_ABORTED);
         return;
@@ -423,11 +408,13 @@ void async_read(struct np_tcp_socket* sock, void* buffer, size_t bufferSize, siz
 
 void tcp_shutdown(struct np_tcp_socket* sock)
 {
+    NABTO_LOG_INFO(LOG, "tcp_shutdown");
     zsock_shutdown(sock->fd, ZSOCK_SHUT_WR);
 }
 
 void tcp_abort(struct np_tcp_socket* sock)
 {
+    NABTO_LOG_INFO(LOG, "tcp_abort");
     if (sock->aborted) {
         return;
     }

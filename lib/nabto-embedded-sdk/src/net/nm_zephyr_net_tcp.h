@@ -17,6 +17,8 @@ void nm_zephyr_net_tcp_handle_select(struct nm_zephyr_net* ctx, int nfds);
 bool nm_zephyr_net_tcp_add_to_poll(struct np_tcp_socket* udpSocket, struct zsock_pollfd* pollfd);
 void nm_zephyr_net_tcp_handle_poll_events(struct np_tcp_socket* udpSocket, struct zsock_pollfd* pollfd);
 
+void nm_zephyr_net_tcp_socket_free_from_poll_loop(struct np_tcp_socket* tcpSocket);
+
 #ifdef __cplusplus
 } //extern "C"
 #endif

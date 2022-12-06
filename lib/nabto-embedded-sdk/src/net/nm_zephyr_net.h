@@ -82,6 +82,8 @@ struct nm_zephyr_net {
     int pipefd[2];
     struct nn_llist udpSockets;
     struct nn_llist tcpSockets;
+    // we cannot close a socket which is in use by poll so defer the operation to the poll operation.
+    struct nn_llist tcpSocketsPendingClose;
 
     //pthread_t thread;
     // synchronize core thread and select thread access to the list of sockets.
