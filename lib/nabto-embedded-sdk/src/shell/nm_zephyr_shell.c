@@ -15,6 +15,7 @@ static int cmd_nabto_test_timestamp(const struct shell *shell, size_t argc, char
 static int cmd_nabto_test_dns(const struct shell *shell, size_t argc, char **argv, void *data);
 static int cmd_nabto_test_local_ip(const struct shell *shell, size_t argc, char **argv, void *data);
 static int cmd_nabto_test_mdns_publish(const struct shell *shell, size_t argc, char **argv, void *data);
+static int cmd_nabto_log_level_set(const struct shell *shell, size_t argc, char **argv, void *data);
 
 static void nabto_log_output(NabtoDeviceLogMessage* msg, void* data);
 
@@ -33,8 +34,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(test_nabto,
         SHELL_SUBCMD_SET_END
 );
 
+SHELL_STATIC_SUBCMD_SET_CREATE(log_nabto,
+    SHELL_CMD_ARG(level, NULL, "Set Log level", cmd_nabto_log_level_set, 2,0),
+    SHELL_SUBCMD_SET_END
+);
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_nabto,
         SHELL_CMD(test, &test_nabto, "Test Nabto integration.", NULL),
+        SHELL_CMD(log, &log_nabto, "Nabto Log Settings.", NULL),
         SHELL_SUBCMD_SET_END
 );
 
@@ -196,6 +203,19 @@ static int cmd_nabto_test_mdns_publish(const struct shell *shell, size_t argc, c
     return 0;
 }
 
+static int cmd_nabto_log_level_set(const struct shell *shell, size_t argc, char **argv, void *data)
+{
+    const char* logLevel = argv[1];
+
+    NabtoDeviceError ec = nabto_device_set_log_level(NULL, logLevel);
+    if (ec == NABTO_DEVICE_EC_OK) {
+        shell_print(shell, "Set log level to %s", logLevel);
+    } else {
+        shell_print(shell, "Could not set log level to %s", logLevel);
+    }
+    return 0;
+}
+
 void nabto_log_output(NabtoDeviceLogMessage* msg, void* data)
 {
     if (msg->severity == NABTO_DEVICE_LOG_ERROR) {
@@ -216,7 +236,7 @@ NabtoDevice* get_default_test_device()
     static bool initialized = false;
     if (!initialized) {
         nabto_device_set_log_callback(NULL, nabto_log_output, NULL);
-        if (nabto_device_set_log_level(NULL, "trace") != NABTO_DEVICE_EC_OK) {
+        if (nabto_device_set_log_level(NULL, "info") != NABTO_DEVICE_EC_OK) {
             LOG_ERR("Failed to set loglevel");
         }
         testDevice = nabto_device_test_new();

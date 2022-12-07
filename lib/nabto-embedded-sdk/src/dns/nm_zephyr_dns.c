@@ -39,7 +39,7 @@ struct np_dns nm_zephyr_dns_get_impl()
 }
 
 
-void dns_resolved(enum dns_resolve_status status, struct dns_addrinfo* addr, void* userData)
+void dns_result_cb(enum dns_resolve_status status, struct dns_addrinfo* addr, void* userData)
 {
     struct dns_request* req = userData;
     if (status == DNS_EAI_INPROGRESS) {
@@ -89,7 +89,7 @@ void async_resolve(enum dns_query_type type, const char* host, struct np_ip_addr
     *ipsResolved = 0;
     req->ipsResolved = ipsResolved;
 
-    int ec = dns_get_addr_info(host, type, &req->dnsId, dns_resolved, req, DNS_TIMEOUT);
+    int ec = dns_get_addr_info(host, type, NULL, dns_result_cb, req, DNS_TIMEOUT);
     if (ec < 0) {
         np_completion_event_resolve(completionEvent, NABTO_EC_UNKNOWN);
         np_free(req);
