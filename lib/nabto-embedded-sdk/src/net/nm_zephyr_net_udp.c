@@ -299,9 +299,9 @@ np_error_code udp_send_to(struct np_udp_socket* s, const struct np_udp_endpoint*
                 status == ENETUNREACH || // if we send ipv6 on a system without it.
                 status == EAFNOSUPPORT) // if we send ipv6 on an ipv4 only socket
             {
-                NABTO_LOG_TRACE(LOG,"ERROR: (%i) '%s' in nm_epoll_event_send_to", (int) status, strerror(status));
+                NABTO_LOG_TRACE(LOG,"ERROR: (%i) '%s' in udp_send_to", (int) status, strerror(status));
             } else {
-                NABTO_LOG_ERROR(LOG,"ERROR: (%i) '%s' in nm_epoll_event_send_to", (int) status, strerror(status));
+                NABTO_LOG_ERROR(LOG,"ERROR: (%i) '%s' in udp_send_to", (int) status, strerror(status));
             }
             return NABTO_EC_FAILED_TO_SEND_PACKET;
         }
