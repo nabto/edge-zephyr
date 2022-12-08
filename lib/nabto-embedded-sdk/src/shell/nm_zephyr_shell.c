@@ -1,7 +1,9 @@
 #include <zephyr/shell/shell.h>
 
+#include <nabto/nabto_device.h>
 #include <nabto/nabto_device_test.h>
 #include <nabto/nabto_device_zephyr.h>
+#include <nabto/nabto_device_experimental.h>
 
 #include "nabto_device_zephyr_internal.h"
 
@@ -22,6 +24,8 @@ static int cmd_nabto_test_mdns_publish(const struct shell *shell, size_t argc, c
 static int cmd_nabto_log_level_set(const struct shell *shell, size_t argc, char **argv, void *data);
 
 static int cmd_nabto_status(const struct shell *shell, size_t argc, char **argv, void *data);
+
+static int cmd_nabto_crypto_speedtest(const struct shell *shell, size_t argc, char **argv, void *data);
 
 
 static NabtoDevice* get_default_test_device();
@@ -48,6 +52,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_nabto,
         SHELL_CMD(test, &test_nabto, "Test Nabto integration.", NULL),
         SHELL_CMD(log, &log_nabto, "Nabto Log Settings.", NULL),
         SHELL_CMD(status, NULL, "Nabto Status.", cmd_nabto_status),
+        SHELL_CMD(crypto_speedtest, NULL, "Crypto speedtest.", cmd_nabto_crypto_speedtest),
         SHELL_SUBCMD_SET_END
 );
 
@@ -240,6 +245,21 @@ static int cmd_nabto_status(const struct shell *shell, size_t argc, char **argv,
     }
     return 0;
 }
+
+static int cmd_nabto_crypto_speedtest(const struct shell *shell, size_t argc, char **argv, void *data)
+{
+    NabtoDevice* device = nabto_device_zephyr_get_default_instance();
+    if (device == NULL) {
+        shell_print(shell, "A Nabto Device object could not be obtained");
+    } else {
+        NabtoDeviceError ec = nabto_device_crypto_speed_test(device);
+        if (ec != NABTO_DEVICE_EC_OK) {
+            shell_print(shell, "crypto speed test failed %s", nabto_device_error_get_message(ec));
+        }
+    }
+    return 0;
+}
+
 
 static NabtoDevice* testDevice = NULL;
 

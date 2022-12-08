@@ -107,6 +107,7 @@ np_error_code create_event(struct np_event_queue* obj, np_event_callback cb, voi
 
 void destroy_event(struct np_event* event)
 {
+    k_work_cancel_delayable(&event->dWork);
     np_free(event);
 }
 
