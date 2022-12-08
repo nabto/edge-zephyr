@@ -244,6 +244,10 @@ void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* s, struct zsock_
 int nm_zephyr_net_udp_nonblocking_socket(int domain, int type)
 {
     int sock = zsock_socket(domain, type, 0);
+    if (sock == -1) {
+        NABTO_LOG_ERROR(LOG, "Cannot create socket domain: %d, type: %d, error: %s", domain, type, strerror(errno));
+        return sock;
+    }
 
     int flags = zsock_fcntl(sock, F_GETFL, 0);
     if (flags == -1) flags = 0;
@@ -393,6 +397,9 @@ np_error_code create_socket_any(struct np_udp_socket* s)
 {
     int sock;
     sock = nm_zephyr_net_udp_nonblocking_socket(AF_INET, SOCK_DGRAM);
+    if (sock == -1) {
+        return NABTO_EC_UDP_SOCKET_CREATION_ERROR;
+    }
 
     s->type = NABTO_IPV4;
     s->sock = sock;

@@ -1,6 +1,9 @@
 #include <zephyr/shell/shell.h>
 
 #include <nabto/nabto_device_test.h>
+#include <nabto/nabto_device_zephyr.h>
+
+#include "nabto_device_zephyr_internal.h"
 
 #include <stdlib.h>
 
@@ -15,9 +18,11 @@ static int cmd_nabto_test_timestamp(const struct shell *shell, size_t argc, char
 static int cmd_nabto_test_dns(const struct shell *shell, size_t argc, char **argv, void *data);
 static int cmd_nabto_test_local_ip(const struct shell *shell, size_t argc, char **argv, void *data);
 static int cmd_nabto_test_mdns_publish(const struct shell *shell, size_t argc, char **argv, void *data);
+
 static int cmd_nabto_log_level_set(const struct shell *shell, size_t argc, char **argv, void *data);
 
-static void nabto_log_output(NabtoDeviceLogMessage* msg, void* data);
+static int cmd_nabto_status(const struct shell *shell, size_t argc, char **argv, void *data);
+
 
 static NabtoDevice* get_default_test_device();
 
@@ -42,6 +47,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(log_nabto,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_nabto,
         SHELL_CMD(test, &test_nabto, "Test Nabto integration.", NULL),
         SHELL_CMD(log, &log_nabto, "Nabto Log Settings.", NULL),
+        SHELL_CMD(status, NULL, "Nabto Status.", cmd_nabto_status),
         SHELL_SUBCMD_SET_END
 );
 
@@ -216,17 +222,23 @@ static int cmd_nabto_log_level_set(const struct shell *shell, size_t argc, char 
     return 0;
 }
 
-void nabto_log_output(NabtoDeviceLogMessage* msg, void* data)
+static int cmd_nabto_status(const struct shell *shell, size_t argc, char **argv, void *data)
 {
-    if (msg->severity == NABTO_DEVICE_LOG_ERROR) {
-        LOG_ERR("%s", msg->message);
-    } else if (msg->severity == NABTO_DEVICE_LOG_INFO) {
-        LOG_INF("%s", msg->message);
-    } else if (msg->severity == NABTO_DEVICE_LOG_WARN) {
-        LOG_WRN("%s", msg->message);
-    } else if (msg->severity == NABTO_DEVICE_LOG_TRACE) {
-        LOG_DBG("%s", msg->message);
+    NabtoDevice* device = nabto_device_zephyr_get_default_instance();
+    if (device == NULL) {
+        shell_print(shell, "A Nabto Device object could not be obtained");
+    } else {
+        const char* productId = nabto_device_get_product_id(device);
+        const char* deviceId = nabto_device_get_device_id(device);
+        char* fp = NULL;
+        nabto_device_get_device_fingerprint(device, &fp);
+        shell_print(shell, "Product id: %s", productId);
+        shell_print(shell, "Device id: %s", deviceId);
+        if (fp != NULL) {
+            shell_print(shell, "Device fingerprint: %s", fp);
+        }
     }
+    return 0;
 }
 
 static NabtoDevice* testDevice = NULL;
@@ -235,10 +247,7 @@ NabtoDevice* get_default_test_device()
 {
     static bool initialized = false;
     if (!initialized) {
-        nabto_device_set_log_callback(NULL, nabto_log_output, NULL);
-        if (nabto_device_set_log_level(NULL, "info") != NABTO_DEVICE_EC_OK) {
-            LOG_ERR("Failed to set loglevel");
-        }
+        nabto_device_zephyr_internal_init_logging();
         testDevice = nabto_device_test_new();
         if (testDevice == NULL) {
             LOG_ERR("Could not create a test device instance");

@@ -1,0 +1,15 @@
+mainmenu "Nabto Edge Simple Coap Demo"
+
+config SIMPLE_COAP_PRODUCT_ID
+	string "nabto product id"
+	default "pr-123"
+	help
+	  The nabto product id to use
+
+config SIMPLE_COAP_DEVICE_ID
+	string "nabto device id"
+	default "de-123"
+	help
+	  The nabto device id to use
+
+source "Kconfig.zephyr"

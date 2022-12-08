@@ -16,6 +16,7 @@ set(src
     src/dns/nm_zephyr_dns.c
     src/ts/nm_zephyr_timestamp.c
     src/shell/nm_zephyr_shell.c
+    src/nabto_device_zephyr.c
     ${ne_required_src_no_tls}
     ${ne_mbedtls_module_src}
     ${ne_api_test_src}
@@ -23,7 +24,7 @@ set(src
 )
 
 zephyr_library()
-zephyr_include_directories(${NABTO_EMBEDDED_SDK_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+zephyr_include_directories(${NABTO_EMBEDDED_SDK_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 zephyr_library_include_directories(${ne_priv_include_dirs_no_tls})
 zephyr_library_sources(${src})
 zephyr_link_libraries(mbedTLS)
