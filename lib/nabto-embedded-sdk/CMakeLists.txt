@@ -17,6 +17,7 @@ set(src
     src/ts/nm_zephyr_timestamp.c
     src/shell/nm_zephyr_shell.c
     src/nabto_device_zephyr.c
+    src/nabto_device_zephyr_private_key.c
     ${ne_required_src_no_tls}
     ${ne_mbedtls_module_src}
     ${ne_api_test_src}
