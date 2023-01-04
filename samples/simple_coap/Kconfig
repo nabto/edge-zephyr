@@ -12,4 +12,10 @@ config SIMPLE_COAP_DEVICE_ID
 	help
 	  The nabto device id to use
 
+config SIMPLE_COAP_PRIVATE_KEY
+    string "nabto device key"
+	default ""
+	help
+	  The nabto device key as a hex encoded 256bit random number
+
 source "Kconfig.zephyr"

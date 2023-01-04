@@ -2,6 +2,7 @@
 #include <zephyr/settings/settings.h>
 
 #include <nabto/nabto_device_test.h>
+#include <nabto/nabto_device_experimental.h>
 #include <nabto/nabto_device_zephyr.h>
 
 #if IS_ENABLED(CONFIG_SETTINGS_FS)
@@ -88,13 +89,14 @@ void main(void)
     ec = nabto_device_set_device_id(device, CONFIG_SIMPLE_COAP_DEVICE_ID);
     ASSERT_NABTO_EC(ec);
 
-    ec = nabto_device_zephyr_load_private_key(device);
-    ASSERT_NABTO_EC(ec);
+    uint8_t key[32];
+    __ASSERT(strlen(CONFIG_SIMPLE_COAP_PRIVATE_KEY) == 64, "CONFIG_SIMPLE_COAP_PRIVATE_KEY should be 64 hex characters");
+    size_t convertedLength = hex2bin(CONFIG_SIMPLE_COAP_PRIVATE_KEY, strlen(CONFIG_SIMPLE_COAP_PRIVATE_KEY), key, sizeof(key));
+    __ASSERT(convertedLength == sizeof(key), "Could not parse the hex string CONFIG_SIMPLE_COAP_PRIVATE_KEY");
+    ec = nabto_device_set_private_key_secp256r1(device, key, sizeof(key));
 
     ec = nabto_device_enable_mdns(device);
     ASSERT_NABTO_EC(ec);
-
-
 
     NabtoDeviceFuture* future = nabto_device_future_new(device);
     __ASSERT(future != NULL, "Future is null");
