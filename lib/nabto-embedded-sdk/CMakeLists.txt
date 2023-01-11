@@ -18,10 +18,13 @@ set(src
     src/shell/nm_zephyr_shell.c
     src/nabto_device_zephyr.c
     src/nabto_device_zephyr_private_key.c
+    src/nm_file_zephyr.c
     ${ne_required_src_no_tls}
     ${ne_mbedtls_module_src}
     ${ne_api_test_src}
     ${ne_modules_mdns_src}
+    ${ne_iam_src}
+    ${ne_cjson_src}
 )
 
 zephyr_library()

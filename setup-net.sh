@@ -95,13 +95,9 @@ if [ "$ACTION" != stop ]; then
 	ip route add $IPV4_ROUTE_1 dev $INTERFACE > /dev/null 2>&1
 
 	sysctl -w net.ipv4.ip_forward=1
-
-	nft --version 2>&1 > /dev/null
-	if [ $? -ne 0 ]; then
-  		echo "missing nft executable, install the nftables package"
-	else
-  		./firewall.nft
-	fi
+    iptables -t nat -A PREROUTING -j ACCEPT
+    iptables -A FORWARD -j ACCEPT
+    iptables -t nat -A POSTROUTING --out-interface  wlp61s0 -j MASQUERADE
 fi
 
 if [ "$ACTION" = "" ]; then
@@ -111,6 +107,9 @@ if [ "$ACTION" = "" ]; then
 fi
 
 if [ "$ACTION" != start ]; then
+    iptables -t nat -D POSTROUTING --out-interface  wlp61s0 -j MASQUERADE
+    iptables -D FORWARD -j ACCEPT
+    iptables -t nat -D PREROUTING -j ACCEPT
     ip link set $IFACE down
 
     if [ -f "$CONF_FILE".stop ]; then

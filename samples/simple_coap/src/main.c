@@ -98,6 +98,9 @@ void main(void)
     ec = nabto_device_enable_mdns(device);
     ASSERT_NABTO_EC(ec);
 
+    ec = nabto_device_add_server_connect_token(device, "demosct");
+    ASSERT_NABTO_EC(ec);
+
     NabtoDeviceFuture* future = nabto_device_future_new(device);
     __ASSERT(future != NULL, "Future is null");
 
