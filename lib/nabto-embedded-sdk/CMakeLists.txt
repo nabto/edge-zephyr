@@ -28,8 +28,8 @@ set(src
 )
 
 zephyr_library()
-zephyr_include_directories(${NABTO_EMBEDDED_SDK_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
-zephyr_library_include_directories(${ne_priv_include_dirs_no_tls})
+zephyr_include_directories(${NABTO_EMBEDDED_SDK_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include ${NABTO_EMBEDDED_SDK_DIR}/src)
+zephyr_library_include_directories(${ne_priv_include_dirs_no_tls} ${ne_cjson_include_dir})
 zephyr_library_sources(${src})
 zephyr_link_libraries(mbedTLS)
 zephyr_library_compile_definitions(-DNABTO_DEVICE_NO_FUTURE_QUEUE)

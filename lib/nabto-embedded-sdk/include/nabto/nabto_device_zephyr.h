@@ -3,7 +3,7 @@
 
 #include <nabto/nabto_device.h>
 
-#include <modules/file/nm_file.h>
+#include <modules/fs/nm_fs.h>
 
 NabtoDevice* nabto_device_zephyr_get_default_instance();
 
