@@ -27,3 +27,29 @@ west flash
 ```
 
 Open a terminal and use the zephyr shell.
+
+
+# Running on posix_sim
+
+Posix sim a posix implementation of zephyr which can run on. The implementation
+uses networking through a layer 3 tap interface and a psuedotty for stdin and
+stdout.
+
+Building:
+
+```
+west build -p always -b native_posix_64 samples/simple_coap
+```
+
+Running:
+
+The demo uses a tap interface the tap interface can be setup with
+`./setup-net.sh` the outgoing interface needs to be set to the desired outgoing
+interface on the system.
+
+```
+west build -t run
+```
+
+Screen can be used to connect to the pseudotty such that it is possible to use
+the shell. `screen <pseudotty>` e.g. `screen /dev/pts/17`

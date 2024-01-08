@@ -209,6 +209,6 @@ void mdns_update_ipv6_socket_registration(int sock)
     if (maddr == NULL) {
         NABTO_LOG_ERROR(LOG, "Could not add ipv6 multicast address.");
     } else {
-        net_if_ipv6_maddr_join(maddr);
+        net_if_ipv6_maddr_join(iface, maddr);
     }
 }

@@ -62,6 +62,7 @@ if [ `id -u` != 0 ]; then
 fi
 
 IFACE=zeth
+OUT_INTERFACE=wlp0s20f3
 
 INTERFACE=${IFACE}
 
@@ -97,7 +98,7 @@ if [ "$ACTION" != stop ]; then
 	sysctl -w net.ipv4.ip_forward=1
     iptables -t nat -A PREROUTING -j ACCEPT
     iptables -A FORWARD -j ACCEPT
-    iptables -t nat -A POSTROUTING --out-interface  wlp61s0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING --out-interface ${OUT_INTERFACE} -j MASQUERADE
 fi
 
 if [ "$ACTION" = "" ]; then
@@ -107,7 +108,7 @@ if [ "$ACTION" = "" ]; then
 fi
 
 if [ "$ACTION" != start ]; then
-    iptables -t nat -D POSTROUTING --out-interface  wlp61s0 -j MASQUERADE
+    iptables -t nat -D POSTROUTING --out-interface ${OUT_INTERFACE} -j MASQUERADE
     iptables -D FORWARD -j ACCEPT
     iptables -t nat -D PREROUTING -j ACCEPT
     ip link set $IFACE down

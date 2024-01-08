@@ -14,7 +14,7 @@ manifest:
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: v3.2.0
+      revision: v3.5.0
       import: true
     - name: nabto-embedded-sdk
       remote: nabto
