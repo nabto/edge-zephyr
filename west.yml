@@ -18,6 +18,6 @@ manifest:
       import: true
     - name: nabto-embedded-sdk
       remote: nabto
-      revision: master
+      revision: 1e97243f9473b5c3c06345b93ac3becf5969e93b
       submodules: true
       path: modules/lib/nabto-embedded-sdk
