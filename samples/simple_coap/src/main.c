@@ -57,14 +57,14 @@ static void init_fs()
 #endif
 }
 
-void main(void)
+int main(void)
 {
     init_fs();
     int status;
     status = settings_subsys_init();
     if (status != 0) {
         LOG_ERR("Cannot init settings %s", strerror(-status));
-        return;
+        return 1;
     }
     status = settings_load();
     __ASSERT(status == 0, "cannot load settings");
@@ -145,4 +145,5 @@ void main(void)
 
     nabto_device_listener_free(listener);
     nabto_device_future_free(future);
+    return 0;
 }

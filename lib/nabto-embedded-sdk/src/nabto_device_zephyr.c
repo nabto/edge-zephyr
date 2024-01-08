@@ -5,7 +5,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(nabto);
+LOG_MODULE_REGISTER(nabto, LOG_LEVEL_DBG);
 
 static void nabto_log_output(NabtoDeviceLogMessage* msg, void* data);
 
