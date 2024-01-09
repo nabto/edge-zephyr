@@ -53,3 +53,19 @@ west build -t run
 
 Screen can be used to connect to the pseudotty such that it is possible to use
 the shell. `screen <pseudotty>` e.g. `screen /dev/pts/17`
+
+
+# Build with nrf sdk
+
+Create a shell
+
+```
+source zephyr/zephyr-env.sh
+
+nrfutil toolchain-manager launch --shell
+```
+
+
+## Build with extra verbosity
+
+west build -p always -b nrf9160dk_nrf9160_ns  samples_nrf/mbedtls_test/ -- -G'Unix Makefiles' -DCMAKE_VERBOSE_MAKEFILE=ON
