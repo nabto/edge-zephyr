@@ -89,9 +89,10 @@ void async_resolve(enum dns_query_type type, const char* host, struct np_ip_addr
     *ipsResolved = 0;
     req->ipsResolved = ipsResolved;
     // TODO fix dns when we get there.
-    int ec = 42;
-    // int ec = dns_get_addr_info(host, type, NULL, dns_result_cb, req, DNS_TIMEOUT);
+    //int ec = -42;
+    int ec = dns_get_addr_info(host, type, NULL, dns_result_cb, req, DNS_TIMEOUT);
     if (ec < 0) {
+        NABTO_LOG_ERROR(LOG, "Dns resolve failed %d error: %s, hoat: %s, type: %d, req: %d", ec, strerror(-ec), host, type, req);
         np_completion_event_resolve(completionEvent, NABTO_EC_UNKNOWN);
         np_free(req);
     } else {

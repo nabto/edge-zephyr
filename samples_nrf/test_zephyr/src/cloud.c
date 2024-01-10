@@ -104,6 +104,7 @@ int cloud_init()
     NabtoDevice* device = nabto_device_zephyr_get_default_instance();
 
     __ASSERT(device != NULL, "Device is NULL");
+    nabto_device_set_log_level(NULL, "trace");
 
     ec = nabto_device_set_product_id(device, CONFIG_SIMPLE_COAP_PRODUCT_ID);
     ASSERT_NABTO_EC(ec);
