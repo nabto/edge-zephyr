@@ -88,8 +88,9 @@ void async_resolve(enum dns_query_type type, const char* host, struct np_ip_addr
     req->ipsSize = ipsSize;
     *ipsResolved = 0;
     req->ipsResolved = ipsResolved;
-
-    int ec = dns_get_addr_info(host, type, NULL, dns_result_cb, req, DNS_TIMEOUT);
+    // TODO fix dns when we get there.
+    int ec = 42;
+    // int ec = dns_get_addr_info(host, type, NULL, dns_result_cb, req, DNS_TIMEOUT);
     if (ec < 0) {
         np_completion_event_resolve(completionEvent, NABTO_EC_UNKNOWN);
         np_free(req);

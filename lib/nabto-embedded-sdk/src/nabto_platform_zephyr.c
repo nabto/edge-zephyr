@@ -52,12 +52,15 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     struct np_dns dns = nm_zephyr_dns_get_impl();
     struct np_local_ip localIp = nm_zephyr_net_local_ip_get_impl(&platformAdapter->netCtx);
 
+#if defined(NET_ROUTE_MCAST)
+
     struct nm_mdns_udp_bind mdnsUdpBind = nm_zephyr_net_mdns_udp_bind_get_impl(&platformAdapter->netCtx);
     ec = nm_mdns_server_init(&platformAdapter->mdnsServer, &eq, &udp, &mdnsUdpBind, &localIp);
     if (ec != NABTO_EC_OK) {
         NABTO_LOG_ERROR(LOG, "Could not start mdns server");
         return ec;
     }
+#endif
 
     struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
 
