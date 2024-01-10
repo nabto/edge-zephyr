@@ -6,6 +6,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net/dns_resolve.h>
 #include <date_time.h>
 
 #include <zephyr/net/net_if.h>
@@ -22,7 +23,17 @@ LOG_MODULE_REGISTER(cloud, LOG_LEVEL_DBG);
 #define STORAGE_PARTITION	storage_partition
 #define STORAGE_PARTITION_ID	FIXED_PARTITION_ID(STORAGE_PARTITION)
 
-#define ASSERT_NABTO_EC(ec) __ASSERT(ec == NABTO_DEVICE_EC_OK, "Call failed %s", nabto_device_error_get_message(ec))
+#define ASSERT_NABTO_EC(ec)                                                \
+    do                                                                     \
+    {                                                                      \
+        if (ec != NABTO_DEVICE_EC_OK)                                      \
+        {                                                                  \
+            LOG_ERR("Call failed %s", nabto_device_error_get_message(ec)); \
+            k_sleep(K_FOREVER);                                            \
+        }                                                                  \
+    } while (false)
+
+// _ASSERT(ec == NABTO_DEVICE_EC_OK, "Call failed %s", nabto_device_error_get_message(ec))
 
 /**** Types ****/
 
@@ -133,6 +144,7 @@ int cloud_init()
 
     LOG_INF("Nabto device started w/o fingerprint, do we have that? \n");
     //nabto_device_string_free(fp);
+    k_sleep(K_FOREVER);
 
     NabtoDeviceListener* listener = nabto_device_listener_new(device);
     __ASSERT(listener != NULL, "Listener is NULL");

@@ -2,6 +2,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/net/dns_resolve.h>
+#include <zephyr/net/socket.h>
 
 #include <platform/np_allocator.h>
 #include <platform/interfaces/np_dns.h>
@@ -78,6 +79,64 @@ void async_resolve_v6(struct np_dns*obj, const char* host, struct np_ip_address*
 
 void async_resolve(enum dns_query_type type, const char* host, struct np_ip_address* ips, size_t ipsSize, size_t* ipsResolved, struct np_completion_event* completionEvent)
 {
+    //struct np_ip_address* ips = event->ips;
+    *ipsResolved = 0;
+    struct addrinfo hints;
+    struct addrinfo *infoptr;
+    memset(&hints, 0, sizeof (struct addrinfo));
+
+    int family;
+    if (type == DNS_QUERY_TYPE_A) {
+        family = AF_INET;
+    } else {
+        family = AF_INET6;
+    }
+
+    hints.ai_socktype = SOCK_DGRAM;
+
+    NABTO_LOG_TRACE(LOG, "Resolving host: %s", host);
+
+    hints.ai_family = family;
+    int res =  getaddrinfo(host, NULL, &hints, &infoptr);
+    if (res != 0) {
+        // Errors may be protocol specific, and not significant. If everything fails, the user will get an error
+        if (res == EAI_SYSTEM) {
+            NABTO_LOG_TRACE(LOG, "Failed to get address info for family %d: (%i) '%s'", family, errno, strerror(errno));
+        } else {
+            NABTO_LOG_TRACE(LOG, "Failed to get address info for family %d: (%i) '%s'", family, res, gai_strerror(res));
+        }
+        np_completion_event_resolve(completionEvent, NABTO_EC_NOT_FOUND);
+        return;
+    }
+    struct addrinfo *p = infoptr;
+
+    size_t resolved = 0;
+    while (p != NULL) {
+        if (*(ipsResolved) < ipsSize) {
+            if (p->ai_family == AF_INET) {
+                ips[resolved].type = NABTO_IPV4;
+                struct sockaddr_in* addr = (struct sockaddr_in*)p->ai_addr;
+                memcpy(ips[resolved].ip.v4, &addr->sin_addr, sizeof(addr->sin_addr));
+                resolved++;
+            } else if (p->ai_family == AF_INET6) {
+                ips[resolved].type = NABTO_IPV6;
+                struct sockaddr_in6* addr = (struct sockaddr_in6*)p->ai_addr;
+                memcpy(ips[resolved].ip.v6, &addr->sin6_addr, sizeof(addr->sin6_addr));
+                resolved++;
+            }
+        }
+        p = p->ai_next;
+    }
+
+    *ipsResolved = resolved;
+
+    freeaddrinfo(infoptr);
+    np_completion_event_resolve(completionEvent, NABTO_EC_OK);
+}
+
+/*
+void async_resolve(enum dns_query_type type, const char* host, struct np_ip_address* ips, size_t ipsSize, size_t* ipsResolved, struct np_completion_event* completionEvent)
+{
     struct dns_request* req = np_calloc(1, sizeof(struct dns_request));
     if (req == NULL) {
         np_completion_event_resolve(completionEvent, NABTO_EC_OUT_OF_MEMORY);
@@ -99,3 +158,4 @@ void async_resolve(enum dns_query_type type, const char* host, struct np_ip_addr
         // request is started;
     }
 }
+*/
