@@ -70,16 +70,17 @@ static void init_fs()
 int cloud_init()
 {
 
-   init_fs();
-   int status;
-   status = settings_subsys_init();
-   if (status != 0) {
-       LOG_ERR("Cannot init settings %s", strerror(-status));
-       return status;
+
+    init_fs();
+    int status;
+    status = settings_subsys_init();
+    if (status != 0)
+    {
+        LOG_ERR("Cannot init settings %s", strerror(-status));
+        return status;
    }
    status = settings_load();
    __ASSERT(status == 0, "cannot load settings");
-
     struct net_if *iface;
     iface = net_if_get_default();
 
@@ -96,8 +97,9 @@ int cloud_init()
     net_dhcpv4_start(iface);
 #endif
 
-
     NabtoDeviceError ec;
+
+    //return 0;
 
     NabtoDevice* device = nabto_device_zephyr_get_default_instance();
 

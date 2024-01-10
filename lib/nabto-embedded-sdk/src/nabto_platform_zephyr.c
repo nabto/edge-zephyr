@@ -50,6 +50,7 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     struct np_event_queue eq = nabto_event_queue_zephyr_get_impl(&platformAdapter->eventQueueZephyr);
     struct np_timestamp timestamp = nm_zephyr_ts_get_impl();
     struct np_dns dns = nm_zephyr_dns_get_impl();
+
     struct np_local_ip localIp = nm_zephyr_net_local_ip_get_impl(&platformAdapter->netCtx);
 
 #if defined(NET_ROUTE_MCAST)
@@ -62,7 +63,7 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     }
 #endif
 
-    struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
+    //struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
 
     nabto_device_integration_set_udp_impl(device, &udp);
     nabto_device_integration_set_tcp_impl(device, &tcp);
@@ -70,7 +71,7 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     nabto_device_integration_set_dns_impl(device, &dns);
     nabto_device_integration_set_event_queue_impl(device, &eq);
     nabto_device_integration_set_local_ip_impl(device, &localIp);
-    nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
+    //nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
 
     return NABTO_EC_OK;
 }
