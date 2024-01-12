@@ -4,7 +4,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(mbedtls_test LANGUAGES C VERSION 1.0.0)
 
 zephyr_system_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-zephyr_library_compile_definitions(-DMBEDTLS_SSL_ALPN)
+#zephyr_library_compile_definitions(-DMBEDTLS_SSL_ALPN)
 
 target_sources(app PRIVATE src/main.c)
 

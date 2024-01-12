@@ -3,7 +3,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(app LANGUAGES C VERSION 1.0.0)
 
-target_sources(app PRIVATE src/main.c src/modem.c src/cloud.c)
+#zephyr_system_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/tls_config)
+#zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/tls_config)
 
-zephyr_system_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/tls_config)
-zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/tls_config)
+
+target_sources(app PRIVATE src/main.c src/modem.c src/cloud.c)
