@@ -144,7 +144,6 @@ int cloud_init()
 
     LOG_INF("Nabto device started w/o fingerprint, do we have that? \n");
     //nabto_device_string_free(fp);
-    k_sleep(K_FOREVER);
 
     NabtoDeviceListener* listener = nabto_device_listener_new(device);
     __ASSERT(listener != NULL, "Listener is NULL");
