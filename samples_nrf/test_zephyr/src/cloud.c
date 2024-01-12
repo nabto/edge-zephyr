@@ -130,7 +130,7 @@ int cloud_init()
     ec = nabto_device_set_private_key_secp256r1(device, key, sizeof(key));
     //ec = nabto_device_enable_mdns(device);
     ASSERT_NABTO_EC(ec);
-    ec = nabto_device_add_server_connect_token(device, "svepsct");
+    ec = nabto_device_add_server_connect_token(device, "demosct");
     ASSERT_NABTO_EC(ec);
 
     NabtoDeviceFuture* future = nabto_device_future_new(device);
