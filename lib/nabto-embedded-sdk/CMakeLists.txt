@@ -1,4 +1,10 @@
-set(NABTO_EMBEDDED_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../modules/lib/nabto-embedded-sdk)
+execute_process(
+    COMMAND west topdir
+    OUTPUT_VARIABLE WEST_TOPDIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+set(NABTO_EMBEDDED_SDK_DIR ${WEST_TOPDIR}/modules/lib/nabto-embedded-sdk)
 
 include(${NABTO_EMBEDDED_SDK_DIR}/nabto_primary_files.cmake)
 include(${NABTO_EMBEDDED_SDK_DIR}/nabto_modules_files.cmake)
@@ -8,6 +14,7 @@ set(src
     src/nabto_mutex_zephyr.c
     src/nabto_event_queue_zephyr.c
     #src/net/nm_zephyr_net_mdns_udp_bind.c
+    src/net/netctrl.c
     src/net/nm_zephyr_net_tcp.c
     src/net/nm_zephyr_net_udp.c
     src/net/nm_zephyr_net.c

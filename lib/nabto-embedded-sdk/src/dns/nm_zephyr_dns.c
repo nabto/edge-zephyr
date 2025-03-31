@@ -74,7 +74,8 @@ void async_resolve_v4(struct np_dns* obj, const char* host, struct np_ip_address
 
 void async_resolve_v6(struct np_dns*obj, const char* host, struct np_ip_address* ips, size_t ipsSize, size_t* ipsResolved, struct np_completion_event* completionEvent)
 {
-    async_resolve(DNS_QUERY_TYPE_AAAA, host, ips, ipsSize, ipsResolved, completionEvent);
+    // async_resolve(DNS_QUERY_TYPE_AAAA, host, ips, ipsSize, ipsResolved, completionEvent);
+    np_completion_event_resolve(completionEvent, NABTO_EC_NOT_SUPPORTED);
 }
 
 void async_resolve(enum dns_query_type type, const char* host, struct np_ip_address* ips, size_t ipsSize, size_t* ipsResolved, struct np_completion_event* completionEvent)

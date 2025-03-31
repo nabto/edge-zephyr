@@ -23,6 +23,8 @@ struct nm_zephyr_net_udp_recv_wait_context {
 struct np_udp_socket {
     struct nm_zephyr_net* selectCtx;
     int sock;
+    int port;
+    bool bound;
     enum np_ip_address_type type;
 
     struct nn_llist_node udpSocketsNode;
