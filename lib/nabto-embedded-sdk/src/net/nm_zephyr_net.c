@@ -1,7 +1,7 @@
 #include "nm_zephyr_net.h"
 #include "nm_zephyr_net_udp.h"
 #include "nm_zephyr_net_tcp.h"
-#include "llist.h"
+#include <nn/llist.h>
 
 #include <platform/np_logging.h>
 #include <platform/np_util.h>
@@ -110,36 +110,46 @@ static void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
         struct pollfd_info* info = &ctx->pollfdInfo[i];
 
         // We have some sort of error, the sockets need recreation
-        if ((pollfd->revents & (ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL)) != 0) {
-            NABTO_LOG_ERROR(LOG, "socket of type %d returned with error", info->type);
+        // if ((pollfd->revents & (ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL)) != 0) {
+        //     NABTO_LOG_ERROR(LOG, "socket of type %d returned with error", info->type);
 
-            if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
-            } else if (info->type == NM_ZEPHYR_NET_TYPE_UDP) {
-                struct np_udp_socket* s = info->ptr;
-                s->bound = false;
-                if (s->recv.completionEvent != NULL) {
-                    struct np_completion_event* ev = s->recv.completionEvent;
-                    s->recv.completionEvent = NULL;
-                    np_completion_event_resolve(ev, NABTO_EC_UDP_SOCKET_ERROR);
-                }
-            } else if (info->type == NM_ZEPHYR_NET_TYPE_TCP) {
-                struct np_tcp_socket* s = info->ptr;
-                nm_zephyr_net_tcp_handle_poll_events(s, pollfd);
-                if (s->connect.completionEvent) {
-                    struct np_completion_event* ev = s->connect.completionEvent;
-                    s->connect.completionEvent = NULL;
-                    np_completion_event_resolve(ev, NABTO_EC_INVALID_CONNECTION);
-                }
-                if (s->write.completionEvent) {
-                    struct np_completion_event* ev = s->write.completionEvent;
-                    s->write.completionEvent = NULL;
-                    np_completion_event_resolve(ev, NABTO_EC_INVALID_CONNECTION);
-                }
-            }
-            continue;
-        }
+        //     if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
+        //     } else if (info->type == NM_ZEPHYR_NET_TYPE_UDP) {
 
-        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT)) != 0) {
+
+
+        //         struct np_udp_socket* s = info->ptr;
+        //         int err;
+        //         socklen_t len;
+        //         if (getsockopt(s->sock, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+        //         {
+        //             if (err == ENETDOWN) {
+
+        //             }
+        //         } else {
+
+        //         }
+        //     } else if (info->type == NM_ZEPHYR_NET_TYPE_TCP)
+        //         {
+        //             struct np_tcp_socket *s = info->ptr;
+        //             nm_zephyr_net_tcp_handle_poll_events(s, pollfd);
+        //             if (s->connect.completionEvent)
+        //             {
+        //                 struct np_completion_event *ev = s->connect.completionEvent;
+        //                 s->connect.completionEvent = NULL;
+        //                 np_completion_event_resolve(ev, NABTO_EC_INVALID_CONNECTION);
+        //             }
+        //             if (s->write.completionEvent)
+        //             {
+        //                 struct np_completion_event *ev = s->write.completionEvent;
+        //                 s->write.completionEvent = NULL;
+        //                 np_completion_event_resolve(ev, NABTO_EC_INVALID_CONNECTION);
+        //             }
+        //         }
+        //     continue;
+        // }
+
+        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR)) != 0) {
             if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
                 char one;
                 (void)zsock_recv(pollfd->fd, &one, 1, 0);
@@ -186,7 +196,7 @@ void add_udp_sockets(struct nm_zephyr_net* ctx)
     struct np_udp_socket* s;
     NN_LLIST_FOREACH(s, &ctx->udpSockets)
     {
-        if (!s->bound) {
+        if (s->state != NM_ZEPHYR_UDP_SOCKET_STATE_BOUND) {
             continue;
         }
 
@@ -238,6 +248,39 @@ void nm_zephyr_net_notify(struct nm_zephyr_net* ctx)
     (void)zsock_send(ctx->pipefd[1], "1", 1, 0);
 }
 
+np_error_code nm_zephyr_net_down(struct nm_zephyr_net* ctx)
+{
+    np_error_code retEc = NABTO_EC_OK;
+    nm_zephyr_net_lock(ctx);
+    struct np_udp_socket* s;
+    NN_LLIST_FOREACH(s, &ctx->udpSockets)
+    {
+        np_error_code ec = nm_zephyr_net_udp_down(s);
+        if (ec != NABTO_EC_OK) {
+            NABTO_LOG_ERROR(LOG, "Cannot bring the socket down");
+            retEc = ec;
+        }
+    }
+    nm_zephyr_net_unlock(ctx);
+    return retEc;
+}
+
+np_error_code nm_zephyr_net_up(struct nm_zephyr_net* ctx)
+{
+    np_error_code retEc = NABTO_EC_OK;
+    nm_zephyr_net_lock(ctx);
+    struct np_udp_socket* s;
+    NN_LLIST_FOREACH(s, &ctx->udpSockets)
+    {
+        np_error_code ec = nm_zephyr_net_udp_up(s);
+        if (ec != NABTO_EC_OK) {
+            NABTO_LOG_ERROR(LOG, "Cannot bring the socket up");
+            retEc = ec;
+        }
+    }
+    nm_zephyr_net_unlock(ctx);
+    return retEc;
+}
 
 void network_thread(void* data, void* data2, void* data3)
 {

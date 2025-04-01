@@ -20,15 +20,30 @@ struct nm_zephyr_net_udp_recv_wait_context {
     struct np_completion_event* completionEvent;
 };
 
+/**
+ * Initially an udp socket is in the NEW state. When the bind function is called
+ * the socket either goes to DOWN or BOUND dependending on the state of the
+ * network. If the network is down the state switches to DOWN. When the
+ * nm_zephyr_net_up function is called the system tries to bring all the sockets
+ * in the DOWN state back up. When nm_zephyr_net_down is called, all sockets in
+ * the BOUND state is closed and the state switches to DOWN.
+ */
+enum nm_zephyr_udp_socket_state
+{
+    NM_ZEPHYR_UDP_SOCKET_STATE_NEW,
+    NM_ZEPHYR_UDP_SOCKET_STATE_DOWN,
+    NM_ZEPHYR_UDP_SOCKET_STATE_BOUND,
+    NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED,
+};
+
 struct np_udp_socket {
     struct nm_zephyr_net* selectCtx;
     int sock;
     int port;
-    bool bound;
     enum np_ip_address_type type;
 
     struct nn_llist_node udpSocketsNode;
-    bool aborted;
+    enum nm_zephyr_udp_socket_state state;
     struct nm_zephyr_net_udp_recv_wait_context recv;
 };
 
@@ -103,6 +118,19 @@ void nm_zephyr_net_deinit(struct nm_zephyr_net* ctx);
 
 void nm_zephyr_net_run(struct nm_zephyr_net* ctx);
 void nm_zephyr_net_stop(struct nm_zephyr_net* ctx);
+
+
+
+/**
+ * When the zephyr network is up call this function. On some platforms a udp
+ * socket can return the ENETDOWN error which is unrecoverable and needs to
+ * result in a new socket to be created.
+ *
+ * nm_zephyr_net_up is used to signal that the network is back up.
+ */
+np_error_code nm_zephyr_net_up(struct nm_zephyr_net *ctx);
+np_error_code nm_zephyr_net_down(struct nm_zephyr_net *ctx);
+
 
 void nm_zephyr_net_lock(struct nm_zephyr_net* ctx);
 void nm_zephyr_net_unlock(struct nm_zephyr_net* ctx);

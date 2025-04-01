@@ -43,8 +43,8 @@ static np_error_code udp_send_to(struct np_udp_socket* s, const struct np_udp_en
 static np_error_code udp_recv_from(struct np_udp_socket* sock, struct np_udp_endpoint* ep, uint8_t* buffer, size_t bufferSize, size_t* readLength);
 static np_error_code bind_port(struct np_udp_socket* s, uint16_t port);
 static uint16_t get_local_port(struct np_udp_socket* s);
-static np_error_code create_socket_any(struct np_udp_socket* s);
-np_error_code nm_zephyr_net_udp_async_bind_port_ec(struct np_udp_socket* sock, uint16_t port);
+static np_error_code create_socket_any(struct np_udp_socket *s);
+np_error_code nm_zephyr_net_udp_async_bind_port_ec(struct np_udp_socket *sock, uint16_t port);
 
 static struct np_udp_functions module = {
     .create           = &nm_zephyr_net_udp_create,
@@ -68,37 +68,22 @@ struct np_udp nm_zephyr_net_udp_get_impl(struct nm_zephyr_net* ctx)
     return obj;
 }
 
-np_error_code nm_zephyr_net_recreate_udp(void)
+np_error_code nm_zephyr_net_udp_down(struct np_udp_socket *udpSocket)
 {
-    if (m_ctx == NULL) {
-        return NABTO_EC_NO_OPERATION;
+    if (udpSocket->state == NM_ZEPHYR_UDP_SOCKET_STATE_BOUND) {
+        zsock_close(udpSocket->sock);
+        udpSocket->state = NM_ZEPHYR_UDP_SOCKET_STATE_DOWN;
     }
-    struct np_udp_socket* s;
-    NN_LLIST_FOREACH(s, &m_ctx->udpSockets)
-    {
-        if (nm_zephyr_net_udp_async_bind_port_ec(s, s->port) == NABTO_EC_OK) { 
-            NABTO_LOG_INFO(LOG, "created new socket");
-        } else {
-            NABTO_LOG_ERROR(LOG, "could not create new socket");
-            return NABTO_EC_UDP_SOCKET_CREATION_ERROR;
-        }
+    return NABTO_EC_OK;
+}
+np_error_code nm_zephyr_net_udp_up(struct np_udp_socket *udpSocket)
+{
+    if (udpSocket->state == NM_ZEPHYR_UDP_SOCKET_STATE_DOWN) {
+        return nm_zephyr_net_udp_async_bind_port_ec(udpSocket, udpSocket->port);
     }
-
     return NABTO_EC_OK;
 }
 
-np_error_code nm_zephyr_net_down(void)
-{
-    struct np_udp_socket* s;
-    NN_LLIST_FOREACH(s, &m_ctx->udpSockets)
-    {
-        zsock_shutdown(s->sock, ZSOCK_SHUT_RDWR);
-        zsock_close(s->sock);
-        s->bound = false;
-    }
-
-    return NABTO_EC_OK;
-}
 
 np_error_code nm_zephyr_net_udp_create(struct np_udp* obj, struct np_udp_socket** sock)
 {
@@ -112,7 +97,7 @@ np_error_code nm_zephyr_net_udp_create(struct np_udp* obj, struct np_udp_socket*
     struct nm_zephyr_net* selectCtx = obj->data;
 
     s->selectCtx = selectCtx;
-    s->aborted = false;
+    s->state = NM_ZEPHYR_UDP_SOCKET_STATE_NEW;
 
     nm_zephyr_net_lock(selectCtx);
     nn_llist_append(&selectCtx->udpSockets, &s->udpSocketsNode, s);
@@ -126,7 +111,7 @@ np_error_code nm_zephyr_net_udp_create(struct np_udp* obj, struct np_udp_socket*
 
 np_error_code nm_zephyr_net_udp_async_bind_port_ec(struct np_udp_socket* sock, uint16_t port)
 {
-    if (sock->aborted) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
         NABTO_LOG_ERROR(LOG, "bind called on aborted socket");
         return NABTO_EC_ABORTED;
     }
@@ -156,12 +141,12 @@ void nm_zephyr_net_udp_async_bind_port(struct np_udp_socket* sock, uint16_t port
 np_error_code nm_zephyr_net_udp_async_send_to_ec(struct np_udp_socket* sock, struct np_udp_endpoint* ep,
                                                   uint8_t* buffer, uint16_t bufferSize)
 {
-    if (sock->aborted) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
         NABTO_LOG_ERROR(LOG, "send to called on aborted socket");
         return NABTO_EC_ABORTED;
     }
 
-    if (!sock->bound)
+    if (sock->state != NM_ZEPHYR_UDP_SOCKET_STATE_BOUND)
     {
         NABTO_LOG_INFO(LOG, "dropping packet due to unbound socket");
         // We have no socket, just drop the packet
@@ -187,7 +172,7 @@ void nm_zephyr_net_udp_async_send_to(struct np_udp_socket* sock, struct np_udp_e
 void nm_zephyr_net_udp_async_recv_wait(struct np_udp_socket* sock,
                                         struct np_completion_event* completionEvent)
 {
-    if (sock->aborted) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
         NABTO_LOG_ERROR(LOG, "recv from called on aborted socket");
         np_completion_event_resolve(completionEvent, NABTO_EC_ABORTED);
         return;
@@ -206,7 +191,7 @@ void nm_zephyr_net_udp_async_recv_wait(struct np_udp_socket* sock,
 
 np_error_code nm_zephyr_net_udp_recv_from(struct np_udp_socket* sock, struct np_udp_endpoint* ep, uint8_t* buffer, size_t bufferSize, size_t* readLength)
 {
-    if (!sock->bound) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_DOWN) {
         return NABTO_EC_AGAIN;
     }
     return udp_recv_from(sock, ep, buffer, bufferSize, readLength);
@@ -214,7 +199,7 @@ np_error_code nm_zephyr_net_udp_recv_from(struct np_udp_socket* sock, struct np_
 
 uint16_t nm_zephyr_net_udp_get_local_port(struct np_udp_socket* sock)
 {
-    if (sock->aborted) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
         NABTO_LOG_ERROR(LOG, "get local port called on aborted socket");
         return 0;
     }
@@ -223,8 +208,8 @@ uint16_t nm_zephyr_net_udp_get_local_port(struct np_udp_socket* sock)
 
 void nm_zephyr_net_udp_abort(struct np_udp_socket* sock)
 {
-    if (!sock->aborted) {
-        sock->aborted = true;
+    if (sock->state != NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
+        sock->state = NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED;
     }
 
     if (sock->recv.completionEvent != NULL) {
@@ -277,6 +262,25 @@ bool nm_zephyr_net_udp_add_to_poll(struct np_udp_socket* s, struct zsock_pollfd*
 
 void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* s, struct zsock_pollfd* pollfd)
 {
+    if ((pollfd->revents & ZSOCK_POLLERR) != 0)
+    {
+        int err;
+        socklen_t len;
+        if (getsockopt(s->sock, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+        {
+            if (err == ENETDOWN)
+            {
+                NABTO_LOG_INFO(LOG, "Socket goes to down state as the interface is brought down.");
+                nm_zephyr_net_udp_down(s);
+            }
+            else
+            {
+                NABTO_LOG_ERROR(LOG, "An unhandled error occured on the socket errno: %d", err);
+            }
+        } else {
+            NABTO_LOG_ERROR(LOG, "Cannot get SO_ERROR from the socket");
+        }
+    }
     if ((pollfd->revents & ZSOCK_POLLIN) != 0) {
         nm_zephyr_net_udp_handle_event(s);
     }
@@ -413,7 +417,7 @@ np_error_code bind_port(struct np_udp_socket* s, uint16_t port)
     NABTO_LOG_TRACE(LOG, "bind returned %i", status);
 
     if (status == 0) {
-        s->bound = true;
+        s->state = NM_ZEPHYR_UDP_SOCKET_STATE_BOUND;
         return NABTO_EC_OK;
     } else {
         return NABTO_EC_UDP_SOCKET_CREATION_ERROR;

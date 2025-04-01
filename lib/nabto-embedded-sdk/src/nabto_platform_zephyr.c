@@ -8,12 +8,15 @@
 
 #include <net/nm_zephyr_net.h>
 #include <net/nm_zephyr_net_mdns_udp_bind.h>
+#include <zephyr/net/net_mgmt.h>
 
 #include "nabto_event_queue_zephyr.h"
 #include <ts/nm_zephyr_timestamp.h>
 #include <dns/nm_zephyr_dns.h>
 
 #include <modules/mdns/nm_mdns_server.h>
+
+
 
 #define LOG NABTO_LOG_MODULE_PLATFORM
 
@@ -22,7 +25,32 @@ struct nabto_device_platform_zephyr {
     struct nm_zephyr_net netCtx;
     struct nabto_event_queue_zephyr eventQueueZephyr;
     struct nm_mdns_server mdnsServer;
+    struct net_mgmt_event_callback mgmtCallback;
 };
+
+
+#define L4_EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+static void l4_event_handler(struct net_mgmt_event_callback *cb,
+                             uint32_t event,
+                             struct net_if *iface)
+{
+    struct nabto_device_platform_zephyr *platform =
+		CONTAINER_OF(cb, struct nabto_device_platform_zephyr, mgmtCallback);
+
+    switch (event)
+    {
+    case NET_EVENT_L4_CONNECTED:
+        NABTO_LOG_INFO(LOG, "Network connectivity established");
+        nm_zephyr_net_up(&platform->netCtx);
+        break;
+    case NET_EVENT_L4_DISCONNECTED:
+        NABTO_LOG_INFO(LOG, "Network connectivity lost");
+        break;
+    default:
+        /* Don't care */
+        return;
+    }
+}
 
 np_error_code nabto_device_platform_init(struct nabto_device_context* device, struct nabto_device_mutex* coreMutex)
 {
@@ -73,12 +101,17 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     nabto_device_integration_set_local_ip_impl(device, &localIp);
     //nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
 
+    net_mgmt_init_event_callback(&platformAdapter->mgmtCallback, l4_event_handler, L4_EVENT_MASK);
+    net_mgmt_add_event_callback(&platformAdapter->mgmtCallback);
+
     return NABTO_EC_OK;
 }
 
 void nabto_device_platform_deinit(struct nabto_device_context* device)
 {
-    np_free(device->platformAdapter);
+    struct nabto_device_platform_zephyr *platformAdapter = (struct nabto_device_platform_zephyr *)device->platformAdapter;
+    net_mgmt_del_event_callback(&platformAdapter->mgmtCallback);
+    np_free(platformAdapter);
 }
 
 void nabto_device_platform_close(struct nabto_device_context* device, struct np_completion_event* closeEvent)

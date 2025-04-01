@@ -49,7 +49,7 @@ struct nm_mdns_udp_bind nm_zephyr_net_mdns_udp_bind_get_impl(struct nm_zephyr_ne
 
 np_error_code nm_zephyr_net_async_bind_mdns_ipv4_ec(struct np_udp_socket* sock)
 {
-    if (sock->aborted) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
         NABTO_LOG_ERROR(LOG, "bind called on aborted socket");
         return NABTO_EC_ABORTED;
     }
@@ -80,7 +80,7 @@ void nm_zephyr_net_async_bind_mdns_ipv4(struct np_udp_socket* sock, struct np_co
 
 np_error_code nm_zephyr_net_async_bind_mdns_ipv6_ec(struct np_udp_socket* sock)
 {
-    if (sock->aborted) {
+    if (sock->state == NM_ZEPHYR_UDP_SOCKET_STATE_ABORTED) {
         NABTO_LOG_ERROR(LOG, "bind called on aborted socket");
         return NABTO_EC_ABORTED;
     }

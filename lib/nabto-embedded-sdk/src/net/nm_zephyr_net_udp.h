@@ -23,9 +23,8 @@ void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* udpSocket, struc
 
 int nm_zephyr_net_udp_nonblocking_socket(int domain, int type);
 
-np_error_code create_socket_any(struct np_udp_socket* s);
-np_error_code nm_zephyr_net_recreate_udp(void);
-np_error_code nm_zephyr_net_down(void);
+np_error_code nm_zephyr_net_udp_down(struct np_udp_socket *udpSocket);
+np_error_code nm_zephyr_net_udp_up(struct np_udp_socket *udpSocket);
 
 #ifdef __cplusplus
 } //extern "C"
