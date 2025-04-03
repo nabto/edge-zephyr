@@ -2,3 +2,7 @@ config NABTO_EMBEDDED_SDK
 	bool "nabto embedded sdk Support"
 	help
 	  This option enables the nabto embedded sdk library
+
+module = NABTO
+module-str = Nabto
+source "subsys/logging/Kconfig.template.log_config"
