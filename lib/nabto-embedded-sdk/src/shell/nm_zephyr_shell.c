@@ -9,7 +9,7 @@
 
 #include <stdlib.h>
 
-LOG_MODULE_REGISTER(nabto_shell);
+LOG_MODULE_DECLARE(nabto);
 
 static int cmd_nabto_test_udp(const struct shell *shell, size_t argc, char **argv, void *data);
 static int cmd_nabto_test_tcp(const struct shell *shell, size_t argc, char **argv, void *data);

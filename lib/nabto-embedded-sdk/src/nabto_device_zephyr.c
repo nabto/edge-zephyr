@@ -5,7 +5,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(nabto, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(nabto, CONFIG_NABTO_LOG_LEVEL);
 
 static void nabto_log_output(NabtoDeviceLogMessage* msg, void* data);
 
@@ -27,7 +27,7 @@ void nabto_device_zephyr_internal_init_logging()
     static bool loggingInitialized = false;
     if (!loggingInitialized) {
         nabto_device_set_log_callback(NULL, nabto_log_output, NULL);
-        nabto_device_set_log_level(NULL, "info");
+        nabto_device_set_log_level(NULL, "trace");
     }
 }
 
