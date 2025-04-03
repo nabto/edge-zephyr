@@ -42,8 +42,7 @@ size_t get_local_ips(struct np_local_ip* obj, struct np_ip_address *addrs, size_
     }
 
     {
-        struct net_if *iface;
-
+        struct net_if *iface = NULL;
         struct in6_addr *v6Addr = net_if_ipv6_get_global_addr(NET_ADDR_PREFERRED, &iface);
 
         if (v6Addr && addrsSize > 0)
