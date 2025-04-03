@@ -108,6 +108,8 @@ struct nm_zephyr_net {
     //pthread_mutex_t mutex;
     bool stopped;
     bool running;
+    struct k_timer socketRecreateTimer;
+    struct k_work socketRecreateWork;
 };
 
 /**

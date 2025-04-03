@@ -30,6 +30,9 @@ static void add_udp_sockets(struct nm_zephyr_net* ctx);
 K_THREAD_STACK_DEFINE(stackData, NM_ZEPHYR_NET_STACK_SIZE);
 struct k_thread threadData;
 
+static void socketRecreateTimerExpire(struct k_timer *timer);
+static void socketRecreateWorkHandler(struct k_work *work);
+
 /**
  * Api functions start
  */
@@ -46,11 +49,16 @@ np_error_code nm_zephyr_net_init(struct nm_zephyr_net* ctx)
         return NABTO_EC_UNKNOWN;
     }
 
+    k_timer_init(&ctx->socketRecreateTimer, socketRecreateTimerExpire, NULL);
+    k_timer_start(&ctx->socketRecreateTimer, K_SECONDS(10), K_SECONDS(10));
+    k_work_init(&ctx->socketRecreateWork, socketRecreateWorkHandler);
+
     return NABTO_EC_OK;
 }
 
 void nm_zephyr_net_deinit(struct nm_zephyr_net* ctx)
 {
+    k_timer_stop(&ctx->socketRecreateTimer);
     nm_zephyr_net_stop(ctx);
 
     if (ctx->running) {
@@ -267,6 +275,7 @@ np_error_code nm_zephyr_net_down(struct nm_zephyr_net* ctx)
 
 np_error_code nm_zephyr_net_up(struct nm_zephyr_net* ctx)
 {
+    NABTO_LOG_TRACE(LOG, "nm_zephyr_net_up called");
     np_error_code retEc = NABTO_EC_OK;
     nm_zephyr_net_lock(ctx);
     struct np_udp_socket* s;
@@ -308,7 +317,19 @@ void network_thread(void* data, void* data2, void* data3)
     }
 }
 
+static void socketRecreateTimerExpire(struct k_timer *timer)
+{
+    struct nm_zephyr_net *net =
+		CONTAINER_OF(timer, struct nm_zephyr_net, socketRecreateTimer);
+    k_work_submit(&net->socketRecreateWork);
+}
 
+static void socketRecreateWorkHandler(struct k_work *work)
+{
+    struct nm_zephyr_net *net =
+		CONTAINER_OF(work, struct nm_zephyr_net, socketRecreateWork);
+    nm_zephyr_net_up(net);
+}
 
 void nm_zephyr_net_lock(struct nm_zephyr_net* ctx)
 {

@@ -28,6 +28,6 @@ manifest:
 
     - name: nabto-embedded-sdk
       remote: nabto
-      revision: 91b88981a27e6d842a5ceb75b9cac13a01902d01
+      revision: b1f2c9d8f55e6f956fef4be4885ac3f4056d3515
       submodules: true
       path: modules/lib/nabto-embedded-sdk

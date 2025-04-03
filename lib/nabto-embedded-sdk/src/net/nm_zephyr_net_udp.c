@@ -260,25 +260,34 @@ bool nm_zephyr_net_udp_add_to_poll(struct np_udp_socket* s, struct zsock_pollfd*
     return false;
 }
 
+/**
+ * Return true iff the network is down.
+ */
+static bool is_netdown(int sock) {
+    int err;
+    socklen_t len;
+    if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+    {
+        if (err == ENETDOWN)
+        {
+            return true;
+        }
+    } else {
+        NABTO_LOG_ERROR(LOG, "Cannot get SO_ERROR from the socket");
+    }
+    return false;
+}
+
 void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* s, struct zsock_pollfd* pollfd)
 {
     if ((pollfd->revents & ZSOCK_POLLERR) != 0)
     {
-        int err;
-        socklen_t len;
-        if (getsockopt(s->sock, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
-        {
-            if (err == ENETDOWN)
-            {
-                NABTO_LOG_INFO(LOG, "Socket goes to down state as the interface is brought down.");
-                nm_zephyr_net_udp_down(s);
-            }
-            else
-            {
-                NABTO_LOG_ERROR(LOG, "An unhandled error occured on the socket errno: %d", err);
-            }
+        if (is_netdown(s->sock)) {
+            NABTO_LOG_INFO(LOG, "Socket goes to down state as the interface is brought down.");
+            nm_zephyr_net_udp_down(s);
         } else {
-            NABTO_LOG_ERROR(LOG, "Cannot get SO_ERROR from the socket");
+            // TODO
+            NABTO_LOG_ERROR(LOG, "An unhandled error occured on the socket");
         }
     }
     if ((pollfd->revents & ZSOCK_POLLIN) != 0) {
@@ -294,6 +303,12 @@ int nm_zephyr_net_udp_nonblocking_socket(int domain, int type)
     if (sock == -1) {
         NABTO_LOG_ERROR(LOG, "Cannot create socket domain: %d, type: %d, error: %s", domain, type, strerror(errno));
         return sock;
+    }
+
+    if (is_netdown(sock)) {
+        NABTO_LOG_ERROR(LOG, "Cannot create socket as the network is down");
+        zsock_close(sock);
+        return -1;
     }
 
     int flags = zsock_fcntl(sock, F_GETFL, 0);
@@ -356,7 +371,7 @@ np_error_code udp_send_to(struct np_udp_socket* s, const struct np_udp_endpoint*
             return NABTO_EC_FAILED_TO_SEND_PACKET;
         }
     }
-
+    NABTO_LOG_TRACE(LOG, "UDP sent packet with size (%d) on socket %d", bufferSize, s->sock);
     return NABTO_EC_OK;
 }
 
