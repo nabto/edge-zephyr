@@ -72,7 +72,7 @@ void handle_scheduled_event(struct k_work* item)
 {
     struct k_work_delayable *dItem = k_work_delayable_from_work(item);
     struct np_event* ev = CONTAINER_OF(dItem, struct np_event, dWork);
-    handle_event(ev);
+    k_work_submit(&ev->work);
 }
 
 void handle_event(struct np_event* ev)
