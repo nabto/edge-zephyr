@@ -76,10 +76,15 @@ np_error_code nm_zephyr_net_udp_down(struct np_udp_socket *udpSocket)
     }
     return NABTO_EC_OK;
 }
-np_error_code nm_zephyr_net_udp_up(struct np_udp_socket *udpSocket)
+np_error_code nm_zephyr_net_udp_up(struct nm_zephyr_net* netCtx, struct np_udp_socket *udpSocket)
 {
-    if (udpSocket->state == NM_ZEPHYR_UDP_SOCKET_STATE_DOWN) {
-        return nm_zephyr_net_udp_async_bind_port_ec(udpSocket, udpSocket->port);
+    np_error_code ec = NABTO_EC_OK;
+    if (udpSocket->state == NM_ZEPHYR_UDP_SOCKET_STATE_DOWN)
+    {
+        ec = nm_zephyr_net_udp_async_bind_port_ec(udpSocket, udpSocket->port);
+        if (ec == NABTO_EC_OK) {
+            nm_zephyr_net_notify(netCtx);
+        }
     }
     return NABTO_EC_OK;
 }

@@ -281,7 +281,7 @@ np_error_code nm_zephyr_net_up(struct nm_zephyr_net* ctx)
     struct np_udp_socket* s;
     NN_LLIST_FOREACH(s, &ctx->udpSockets)
     {
-        np_error_code ec = nm_zephyr_net_udp_up(s);
+        np_error_code ec = nm_zephyr_net_udp_up(ctx, s);
         if (ec != NABTO_EC_OK) {
             NABTO_LOG_ERROR(LOG, "Cannot bring the socket up");
             retEc = ec;
