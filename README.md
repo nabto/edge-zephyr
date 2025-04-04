@@ -6,14 +6,10 @@ Follow the guide at https://docs.zephyrproject.org/latest/develop/getting_starte
 
 ```
 source ~/zephyrproject/.venv/bin/activate
-
-mkdir zephyrworkspace
-cd zephyrworkspace
-git clone git@github.com:nabto/edge-zephyr
+west init -m git@github.com:nabto/edge-zephyr --mr main edge-zephyr
 cd edge-zephyr
-west init -l .
+west update
 ```
-
 
 # Demo application
 
