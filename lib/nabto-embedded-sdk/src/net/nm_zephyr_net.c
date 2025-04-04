@@ -30,6 +30,17 @@ static void add_udp_sockets(struct nm_zephyr_net* ctx);
 K_THREAD_STACK_DEFINE(stackData, NM_ZEPHYR_NET_STACK_SIZE);
 struct k_thread threadData;
 
+
+/**
+ * On some platforms udp sockets can reach a state where they are no longer
+ * useable. On these platforms zsock_poll returns an error for the affected
+ * socket and the socket must be closed. To ensure continued operation of the
+ * platform the socket is later recreated and recv and send operations continue
+ * on the new socket. Ofcourse the new socket has changed port numbers etc. for
+ * all
+ *
+ * Platforms: NRF9160
+ */
 static void socketRecreateTimerExpire(struct k_timer *timer);
 static void socketRecreateWorkHandler(struct k_work *work);
 
@@ -157,7 +168,7 @@ static void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
         //     continue;
         // }
 
-        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR)) != 0) {
+        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL)) != 0) {
             if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
                 char one;
                 (void)zsock_recv(pollfd->fd, &one, 1, 0);

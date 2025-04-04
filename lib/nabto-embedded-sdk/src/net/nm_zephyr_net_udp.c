@@ -22,7 +22,7 @@
 /**
  * Helper function declarations
  */
-static void nm_zephyr_net_udp_handle_event(struct np_udp_socket* sock);
+static void nm_zephyr_net_udp_handle_event(struct np_udp_socket* sock, np_error_code ec);
 static void nm_zephyr_net_udp_free_socket(struct np_udp_socket* sock);
 
 /**
@@ -233,12 +233,12 @@ void nm_zephyr_net_udp_destroy(struct np_udp_socket* sock)
     return;
 }
 
-void nm_zephyr_net_udp_handle_event(struct np_udp_socket* sock)
+void nm_zephyr_net_udp_handle_event(struct np_udp_socket* sock, np_error_code ec)
 {
     if (sock->recv.completionEvent != NULL) {
         struct np_completion_event* ev = sock->recv.completionEvent;
         sock->recv.completionEvent = NULL;
-        np_completion_event_resolve(ev, NABTO_EC_OK);
+        np_completion_event_resolve(ev, ec);
     }
 }
 
@@ -285,18 +285,24 @@ static bool is_netdown(int sock) {
 
 void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* s, struct zsock_pollfd* pollfd)
 {
-    if ((pollfd->revents & ZSOCK_POLLERR) != 0)
+    if ((pollfd->revents & ZSOCK_POLLNVAL) != 0) {
+        NABTO_LOG_ERROR(LOG, "The socket is invalid. %d", s->sock);
+        nm_zephyr_net_udp_handle_event(s, NABTO_EC_UDP_SOCKET_ERROR);
+    } else if ((pollfd->revents & ZSOCK_POLLHUP) != 0) {
+        NABTO_LOG_ERROR(LOG, "The socket has receivec POLLHUP. %d", s->sock);
+        nm_zephyr_net_udp_handle_event(s, NABTO_EC_UDP_SOCKET_ERROR);
+    } else if ((pollfd->revents & (ZSOCK_POLLERR)) != 0)
     {
         if (is_netdown(s->sock)) {
             NABTO_LOG_INFO(LOG, "Socket goes to down state as the interface is brought down.");
             nm_zephyr_net_udp_down(s);
         } else {
             // TODO
-            NABTO_LOG_ERROR(LOG, "An unhandled error occured on the socket");
+            NABTO_LOG_ERROR(LOG, "An unhandled error occured on the socket %d", s->sock);
+            nm_zephyr_net_udp_handle_event(s, NABTO_EC_UDP_SOCKET_ERROR);
         }
-    }
-    if ((pollfd->revents & ZSOCK_POLLIN) != 0) {
-        nm_zephyr_net_udp_handle_event(s);
+    } else if ((pollfd->revents & ZSOCK_POLLIN) != 0) {
+        nm_zephyr_net_udp_handle_event(s, NABTO_EC_OK);
     }
 }
 
