@@ -10,19 +10,11 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: nabto
       url-base: https://github.com/nabto
-    - name: ncs
-      url-base: https://github.com/nrfconnect
-
 
   projects:
-    # - name: zephyr
-    #   remote: zephyrproject-rtos
-    #   revision: v3.5.0
-    #   import: true
-    - name: nrf
-      remote: ncs
-      repo-path: sdk-nrf
-      revision: v2.5.1
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v3.5.0
       import: true
 
 

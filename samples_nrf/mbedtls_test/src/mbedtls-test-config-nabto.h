@@ -1,2 +1,0 @@
-#define MBEDTLS_SSL_ALPN 1
-#define MBEDTLS_CTR_DRBG_C
