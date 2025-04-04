@@ -8,7 +8,6 @@
 
 #include <net/nm_zephyr_net.h>
 #include <net/nm_zephyr_net_mdns_udp_bind.h>
-#include <zephyr/net/net_mgmt.h>
 
 #include "nabto_event_queue_zephyr.h"
 #include <ts/nm_zephyr_timestamp.h>
