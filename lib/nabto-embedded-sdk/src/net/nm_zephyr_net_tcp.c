@@ -90,8 +90,38 @@ bool nm_zephyr_net_tcp_add_to_poll(struct np_tcp_socket* s, struct zsock_pollfd*
     return status;
 }
 
+void handle_poll_error(struct np_tcp_socket* s, np_error_code ec)
+{
+    if (s->connect.completionEvent) {
+        struct np_completion_event* ev = s->connect.completionEvent;
+        s->connect.completionEvent = NULL;
+        np_completion_event_resolve(ev, ec);
+    }
+    if (s->write.completionEvent) {
+        struct np_completion_event* ev = s->write.completionEvent;
+        s->write.completionEvent = NULL;
+        np_completion_event_resolve(ev, ec);
+    }
+    if (s->read.completionEvent) {
+        struct np_completion_event* ev = s->read.completionEvent;
+        s->read.completionEvent = NULL;
+        np_completion_event_resolve(ev, ec);
+    }
+}
+
 void nm_zephyr_net_tcp_handle_poll_events(struct np_tcp_socket* s, struct zsock_pollfd* pollfd)
 {
+    if ((pollfd->revents & ZSOCK_POLLNVAL) != 0) {
+        NABTO_LOG_ERROR(LOG, "The socket is invalid. %d", s->fd);
+        handle_poll_error(s, NABTO_EC_INVALID_SOCKET);
+    } else if ((pollfd->revents & ZSOCK_POLLHUP) != 0) {
+        NABTO_LOG_ERROR(LOG, "The socket has receivec POLLHUP. %d", s->fd);
+        // this is handled in the subsequent read(s).
+    } else if ((pollfd->revents & ZSOCK_POLLERR) != 0) {
+        NABTO_LOG_ERROR(LOG, "The socket has receivec POLLERR. %d", s->fd);
+        handle_poll_error(s, NABTO_EC_UNKNOWN);
+    }
+
     bool read = (pollfd->revents & ZSOCK_POLLIN) != 0;
     bool write = (pollfd->revents & ZSOCK_POLLOUT) != 0;
 

@@ -16,8 +16,10 @@ manifest:
       remote: zephyrproject-rtos
       revision: v3.5.0
       import: true
+
+
     - name: nabto-embedded-sdk
       remote: nabto
-      revision: 1e97243f9473b5c3c06345b93ac3becf5969e93b
+      revision: b1f2c9d8f55e6f956fef4be4885ac3f4056d3515
       submodules: true
       path: modules/lib/nabto-embedded-sdk

@@ -53,3 +53,9 @@ west build -t run
 
 Screen can be used to connect to the pseudotty such that it is possible to use
 the shell. `screen <pseudotty>` e.g. `screen /dev/pts/17`
+
+
+# Building for Nordic Semiconductor Boards using nRF Connect SDK
+
+The repository https://github.com/nabto/edge-zephyr-nrf contains samples for
+Nordic Semiconductor based boards using the nRF Connect SDK.

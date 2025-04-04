@@ -1,6 +1,7 @@
 #include "nm_zephyr_net.h"
 #include "nm_zephyr_net_udp.h"
 #include "nm_zephyr_net_tcp.h"
+#include <nn/llist.h>
 
 #include <platform/np_logging.h>
 #include <platform/np_util.h>
@@ -14,7 +15,7 @@
 /**
  * Helper function declarations
  */
-static void build_fd_sets();
+static void build_fd_sets(struct nm_zephyr_net* ctx);
 static void network_thread(void* data, void* data2, void* data3);
 
 static int nm_zephyr_net_inf_wait(struct nm_zephyr_net* ctx);
@@ -28,6 +29,20 @@ static void add_udp_sockets(struct nm_zephyr_net* ctx);
 #define NM_ZEPHYR_NET_STACK_SIZE 2048
 K_THREAD_STACK_DEFINE(stackData, NM_ZEPHYR_NET_STACK_SIZE);
 struct k_thread threadData;
+
+
+/**
+ * On some platforms udp sockets can reach a state where they are no longer
+ * useable. On these platforms zsock_poll returns an error for the affected
+ * socket and the socket must be closed. To ensure continued operation of the
+ * platform the socket is later recreated and recv and send operations continue
+ * on the new socket. Ofcourse the new socket has changed port numbers etc. for
+ * all
+ *
+ * Platforms: NRF9160
+ */
+static void socketRecreateTimerExpire(struct k_timer *timer);
+static void socketRecreateWorkHandler(struct k_work *work);
 
 /**
  * Api functions start
@@ -45,11 +60,16 @@ np_error_code nm_zephyr_net_init(struct nm_zephyr_net* ctx)
         return NABTO_EC_UNKNOWN;
     }
 
+    k_timer_init(&ctx->socketRecreateTimer, socketRecreateTimerExpire, NULL);
+    k_timer_start(&ctx->socketRecreateTimer, K_SECONDS(10), K_SECONDS(10));
+    k_work_init(&ctx->socketRecreateWork, socketRecreateWorkHandler);
+
     return NABTO_EC_OK;
 }
 
 void nm_zephyr_net_deinit(struct nm_zephyr_net* ctx)
 {
+    k_timer_stop(&ctx->socketRecreateTimer);
     nm_zephyr_net_stop(ctx);
 
     if (ctx->running) {
@@ -102,12 +122,12 @@ int nm_zephyr_net_timed_wait(struct nm_zephyr_net* ctx, uint32_t ms)
     return nfds;
 }
 
-void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
+static void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
 {
     for (size_t i = 0; i < ctx->usedPollfds; i++) {
         struct zsock_pollfd* pollfd = &ctx->pollfds[i];
-        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT)) != 0) {
-            struct pollfd_info* info = &ctx->pollfdInfo[i];
+        struct pollfd_info* info = &ctx->pollfdInfo[i];
+        if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL)) != 0) {
             if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
                 char one;
                 (void)zsock_recv(pollfd->fd, &one, 1, 0);
@@ -154,6 +174,10 @@ void add_udp_sockets(struct nm_zephyr_net* ctx)
     struct np_udp_socket* s;
     NN_LLIST_FOREACH(s, &ctx->udpSockets)
     {
+        if (s->state != NM_ZEPHYR_UDP_SOCKET_STATE_BOUND) {
+            continue;
+        }
+
         if (ctx->usedPollfds > CONFIG_NET_SOCKETS_POLL_MAX-1) {
             NABTO_LOG_ERROR(LOG, "CONFIG_NET_SOCKETS_POLL_MAX set too low");
             return;
@@ -167,7 +191,7 @@ void add_udp_sockets(struct nm_zephyr_net* ctx)
     }
 }
 
-void add_tcp_sockets(struct nm_zephyr_net* ctx)
+static void add_tcp_sockets(struct nm_zephyr_net* ctx)
 {
     struct np_tcp_socket* s;
     NN_LLIST_FOREACH(s, &ctx->tcpSockets)
@@ -185,7 +209,7 @@ void add_tcp_sockets(struct nm_zephyr_net* ctx)
     }
 }
 
-void nm_zephyr_net_remove_tcp_sockets(struct nm_zephyr_net* ctx)
+static void nm_zephyr_net_remove_tcp_sockets(struct nm_zephyr_net* ctx)
 {
     struct nn_llist_iterator it = nn_llist_begin(&ctx->tcpSocketsPendingClose);
     while ( !nn_llist_is_end(&it) ) {
@@ -200,6 +224,41 @@ void nm_zephyr_net_remove_tcp_sockets(struct nm_zephyr_net* ctx)
 void nm_zephyr_net_notify(struct nm_zephyr_net* ctx)
 {
     (void)zsock_send(ctx->pipefd[1], "1", 1, 0);
+}
+
+np_error_code nm_zephyr_net_down(struct nm_zephyr_net* ctx)
+{
+    np_error_code retEc = NABTO_EC_OK;
+    nm_zephyr_net_lock(ctx);
+    struct np_udp_socket* s;
+    NN_LLIST_FOREACH(s, &ctx->udpSockets)
+    {
+        np_error_code ec = nm_zephyr_net_udp_down(s);
+        if (ec != NABTO_EC_OK) {
+            NABTO_LOG_ERROR(LOG, "Cannot bring the socket down");
+            retEc = ec;
+        }
+    }
+    nm_zephyr_net_unlock(ctx);
+    return retEc;
+}
+
+np_error_code nm_zephyr_net_up(struct nm_zephyr_net* ctx)
+{
+    NABTO_LOG_TRACE(LOG, "nm_zephyr_net_up called");
+    np_error_code retEc = NABTO_EC_OK;
+    nm_zephyr_net_lock(ctx);
+    struct np_udp_socket* s;
+    NN_LLIST_FOREACH(s, &ctx->udpSockets)
+    {
+        np_error_code ec = nm_zephyr_net_udp_up(ctx, s);
+        if (ec != NABTO_EC_OK) {
+            NABTO_LOG_ERROR(LOG, "Cannot bring the socket up");
+            retEc = ec;
+        }
+    }
+    nm_zephyr_net_unlock(ctx);
+    return retEc;
 }
 
 void network_thread(void* data, void* data2, void* data3)
@@ -228,7 +287,19 @@ void network_thread(void* data, void* data2, void* data3)
     }
 }
 
+static void socketRecreateTimerExpire(struct k_timer *timer)
+{
+    struct nm_zephyr_net *net =
+		CONTAINER_OF(timer, struct nm_zephyr_net, socketRecreateTimer);
+    k_work_submit(&net->socketRecreateWork);
+}
 
+static void socketRecreateWorkHandler(struct k_work *work)
+{
+    struct nm_zephyr_net *net =
+		CONTAINER_OF(work, struct nm_zephyr_net, socketRecreateWork);
+    nm_zephyr_net_up(net);
+}
 
 void nm_zephyr_net_lock(struct nm_zephyr_net* ctx)
 {

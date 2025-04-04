@@ -95,8 +95,10 @@ int main(void)
     __ASSERT(convertedLength == sizeof(key), "Could not parse the hex string CONFIG_SIMPLE_COAP_PRIVATE_KEY");
     ec = nabto_device_set_private_key_secp256r1(device, key, sizeof(key));
 
+#if defined(NET_ROUTE_MCAST)
     ec = nabto_device_enable_mdns(device);
     ASSERT_NABTO_EC(ec);
+#endif
 
     ec = nabto_device_add_server_connect_token(device, "demosct");
     ASSERT_NABTO_EC(ec);

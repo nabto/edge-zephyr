@@ -15,6 +15,8 @@
 
 #include <modules/mdns/nm_mdns_server.h>
 
+
+
 #define LOG NABTO_LOG_MODULE_PLATFORM
 
 
@@ -50,7 +52,10 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     struct np_event_queue eq = nabto_event_queue_zephyr_get_impl(&platformAdapter->eventQueueZephyr);
     struct np_timestamp timestamp = nm_zephyr_ts_get_impl();
     struct np_dns dns = nm_zephyr_dns_get_impl();
+
     struct np_local_ip localIp = nm_zephyr_net_local_ip_get_impl(&platformAdapter->netCtx);
+
+#if defined(NET_ROUTE_MCAST)
 
     struct nm_mdns_udp_bind mdnsUdpBind = nm_zephyr_net_mdns_udp_bind_get_impl(&platformAdapter->netCtx);
     ec = nm_mdns_server_init(&platformAdapter->mdnsServer, &eq, &udp, &mdnsUdpBind, &localIp);
@@ -58,23 +63,28 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
         NABTO_LOG_ERROR(LOG, "Could not start mdns server");
         return ec;
     }
+#endif
 
+#if defined(NET_ROUTE_MCAST)
     struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
-
+#endif
     nabto_device_integration_set_udp_impl(device, &udp);
     nabto_device_integration_set_tcp_impl(device, &tcp);
     nabto_device_integration_set_timestamp_impl(device, &timestamp);
     nabto_device_integration_set_dns_impl(device, &dns);
     nabto_device_integration_set_event_queue_impl(device, &eq);
     nabto_device_integration_set_local_ip_impl(device, &localIp);
+#if defined(NET_ROUTE_MCAST)
     nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
+#endif
 
     return NABTO_EC_OK;
 }
 
 void nabto_device_platform_deinit(struct nabto_device_context* device)
 {
-    np_free(device->platformAdapter);
+    struct nabto_device_platform_zephyr *platformAdapter = (struct nabto_device_platform_zephyr *)device->platformAdapter;
+    np_free(platformAdapter);
 }
 
 void nabto_device_platform_close(struct nabto_device_context* device, struct np_completion_event* closeEvent)

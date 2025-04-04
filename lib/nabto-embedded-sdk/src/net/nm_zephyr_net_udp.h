@@ -23,6 +23,9 @@ void nm_zephyr_net_udp_handle_poll_events(struct np_udp_socket* udpSocket, struc
 
 int nm_zephyr_net_udp_nonblocking_socket(int domain, int type);
 
+np_error_code nm_zephyr_net_udp_down(struct np_udp_socket *udpSocket);
+np_error_code nm_zephyr_net_udp_up(struct nm_zephyr_net* netCtx, struct np_udp_socket *udpSocket);
+
 #ifdef __cplusplus
 } //extern "C"
 #endif

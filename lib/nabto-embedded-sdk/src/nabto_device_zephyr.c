@@ -12,13 +12,13 @@ static void nabto_log_output(NabtoDeviceLogMessage* msg, void* data);
 void nabto_log_output(NabtoDeviceLogMessage* msg, void* data)
 {
     if (msg->severity == NABTO_DEVICE_LOG_ERROR) {
-        LOG_ERR("%s", msg->message);
+        LOG_ERR("%s:%d %s", msg->file, msg->line, msg->message);
     } else if (msg->severity == NABTO_DEVICE_LOG_INFO) {
         LOG_INF("%s", msg->message);
     } else if (msg->severity == NABTO_DEVICE_LOG_WARN) {
         LOG_WRN("%s", msg->message);
     } else if (msg->severity == NABTO_DEVICE_LOG_TRACE) {
-        LOG_DBG("%s", msg->message);
+        LOG_DBG("%s:%d %s", msg->file, msg->line, msg->message);
     }
 }
 
