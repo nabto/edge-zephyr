@@ -127,47 +127,6 @@ static void nm_zephyr_net_read(struct nm_zephyr_net* ctx, int nfds)
     for (size_t i = 0; i < ctx->usedPollfds; i++) {
         struct zsock_pollfd* pollfd = &ctx->pollfds[i];
         struct pollfd_info* info = &ctx->pollfdInfo[i];
-
-        // We have some sort of error, the sockets need recreation
-        // if ((pollfd->revents & (ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL)) != 0) {
-        //     NABTO_LOG_ERROR(LOG, "socket of type %d returned with error", info->type);
-
-        //     if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
-        //     } else if (info->type == NM_ZEPHYR_NET_TYPE_UDP) {
-
-
-
-        //         struct np_udp_socket* s = info->ptr;
-        //         int err;
-        //         socklen_t len;
-        //         if (getsockopt(s->sock, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
-        //         {
-        //             if (err == ENETDOWN) {
-
-        //             }
-        //         } else {
-
-        //         }
-        //     } else if (info->type == NM_ZEPHYR_NET_TYPE_TCP)
-        //         {
-        //             struct np_tcp_socket *s = info->ptr;
-        //             nm_zephyr_net_tcp_handle_poll_events(s, pollfd);
-        //             if (s->connect.completionEvent)
-        //             {
-        //                 struct np_completion_event *ev = s->connect.completionEvent;
-        //                 s->connect.completionEvent = NULL;
-        //                 np_completion_event_resolve(ev, NABTO_EC_INVALID_CONNECTION);
-        //             }
-        //             if (s->write.completionEvent)
-        //             {
-        //                 struct np_completion_event *ev = s->write.completionEvent;
-        //                 s->write.completionEvent = NULL;
-        //                 np_completion_event_resolve(ev, NABTO_EC_INVALID_CONNECTION);
-        //             }
-        //         }
-        //     continue;
-        // }
-
         if ((pollfd->revents & (ZSOCK_POLLIN | ZSOCK_POLLOUT | ZSOCK_POLLERR | ZSOCK_POLLHUP | ZSOCK_POLLNVAL)) != 0) {
             if (info->type == NM_ZEPHYR_NET_TYPE_PIPE) {
                 char one;

@@ -57,14 +57,11 @@ static struct np_udp_functions module = {
     .get_local_port   = &nm_zephyr_net_udp_get_local_port
 };
 
-static struct nm_zephyr_net *m_ctx;
-
 struct np_udp nm_zephyr_net_udp_get_impl(struct nm_zephyr_net* ctx)
 {
     struct np_udp obj;
     obj.mptr = &module;
     obj.data = ctx;
-    m_ctx = ctx;
     return obj;
 }
 

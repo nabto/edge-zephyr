@@ -74,17 +74,16 @@ void async_resolve_v4(struct np_dns* obj, const char* host, struct np_ip_address
 
 void async_resolve_v6(struct np_dns*obj, const char* host, struct np_ip_address* ips, size_t ipsSize, size_t* ipsResolved, struct np_completion_event* completionEvent)
 {
-    // async_resolve(DNS_QUERY_TYPE_AAAA, host, ips, ipsSize, ipsResolved, completionEvent);
-    np_completion_event_resolve(completionEvent, NABTO_EC_NOT_SUPPORTED);
+    async_resolve(DNS_QUERY_TYPE_AAAA, host, ips, ipsSize, ipsResolved, completionEvent);
 }
 
 void async_resolve(enum dns_query_type type, const char* host, struct np_ip_address* ips, size_t ipsSize, size_t* ipsResolved, struct np_completion_event* completionEvent)
 {
     //struct np_ip_address* ips = event->ips;
     *ipsResolved = 0;
-    struct addrinfo hints;
-    struct addrinfo *infoptr;
-    memset(&hints, 0, sizeof (struct addrinfo));
+    struct zsock_addrinfo hints;
+    struct zsock_addrinfo *infoptr;
+    memset(&hints, 0, sizeof (struct zsock_addrinfo));
 
     int family;
     if (type == DNS_QUERY_TYPE_A) {
@@ -98,18 +97,18 @@ void async_resolve(enum dns_query_type type, const char* host, struct np_ip_addr
     NABTO_LOG_TRACE(LOG, "Resolving host: %s", host);
 
     hints.ai_family = family;
-    int res =  getaddrinfo(host, NULL, &hints, &infoptr);
+    int res = zsock_getaddrinfo(host, NULL, &hints, &infoptr);
     if (res != 0) {
         // Errors may be protocol specific, and not significant. If everything fails, the user will get an error
-        if (res == EAI_SYSTEM) {
+        if (res == DNS_EAI_SYSTEM) {
             NABTO_LOG_TRACE(LOG, "Failed to get address info for family %d: (%i) '%s'", family, errno, strerror(errno));
         } else {
-            NABTO_LOG_TRACE(LOG, "Failed to get address info for family %d: (%i) '%s'", family, res, gai_strerror(res));
+            NABTO_LOG_TRACE(LOG, "Failed to get address info for family %d: (%i) '%s'", family, res, zsock_gai_strerror(res));
         }
         np_completion_event_resolve(completionEvent, NABTO_EC_NOT_FOUND);
         return;
     }
-    struct addrinfo *p = infoptr;
+    struct zsock_addrinfo *p = infoptr;
 
     size_t resolved = 0;
     while (p != NULL) {
@@ -131,7 +130,7 @@ void async_resolve(enum dns_query_type type, const char* host, struct np_ip_addr
 
     *ipsResolved = resolved;
 
-    freeaddrinfo(infoptr);
+    zsock_freeaddrinfo(infoptr);
     np_completion_event_resolve(completionEvent, NABTO_EC_OK);
 }
 

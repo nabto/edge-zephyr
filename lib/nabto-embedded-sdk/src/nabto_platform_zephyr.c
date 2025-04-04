@@ -66,15 +66,18 @@ np_error_code nabto_device_platform_init(struct nabto_device_context* device, st
     }
 #endif
 
-    //struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
-
+#if defined(NET_ROUTE_MCAST)
+    struct np_mdns mdnsImpl = nm_mdns_server_get_impl(&platformAdapter->mdnsServer);
+#endif
     nabto_device_integration_set_udp_impl(device, &udp);
     nabto_device_integration_set_tcp_impl(device, &tcp);
     nabto_device_integration_set_timestamp_impl(device, &timestamp);
     nabto_device_integration_set_dns_impl(device, &dns);
     nabto_device_integration_set_event_queue_impl(device, &eq);
     nabto_device_integration_set_local_ip_impl(device, &localIp);
-    //nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
+#if defined(NET_ROUTE_MCAST)
+    nabto_device_integration_set_mdns_impl(device, &mdnsImpl);
+#endif
 
     return NABTO_EC_OK;
 }

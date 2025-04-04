@@ -13,11 +13,10 @@ set(src
     src/nabto_platform_zephyr.c
     src/nabto_mutex_zephyr.c
     src/nabto_event_queue_zephyr.c
-    #src/net/nm_zephyr_net_mdns_udp_bind.c
+    src/net/nm_zephyr_net_mdns_udp_bind.c
     src/net/nm_zephyr_net_tcp.c
     src/net/nm_zephyr_net_udp.c
     src/net/nm_zephyr_net.c
-    #src/net/nm_zephyr_net_mdns_udp_bind.c
     src/net/nm_zephyr_net_local_ip.c
     src/dns/nm_zephyr_dns.c
     src/ts/nm_zephyr_timestamp.c
